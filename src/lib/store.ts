@@ -1,4 +1,4 @@
-import { CorporateGroup, Entity, Lease, DashboardStats } from './types';
+import { CorporateGroup, Entity, Lease, DashboardStats, LeaseModification } from './types';
 import { computeLease } from './computations';
 
 const STORAGE_KEYS = {

@@ -25,6 +25,7 @@ const defaultLease: Partial<Lease> = {
   low_value_flag: false,
   status: 'Active',
   escalations: [],
+  modifications: [],
 };
 
 export default function LeaseForm() {
