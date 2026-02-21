@@ -16,6 +16,7 @@ export interface Entity {
 export type PaymentFrequency = 'Monthly' | 'Quarterly' | 'Annual';
 export type LeaseEvent = 'INITIAL' | 'MODIFICATION' | 'TERMINATION';
 export type LeaseStatus = 'Active' | 'Terminated';
+export type ModificationType = 'SCOPE_INCREASE' | 'SCOPE_DECREASE' | 'TERM_CHANGE' | 'PAYMENT_CHANGE' | 'EARLY_TERMINATION';
 
 export interface Lease {
   lease_id: string;
@@ -44,11 +45,36 @@ export interface Lease {
   status: LeaseStatus;
   created_at: string;
   escalations: Escalation[];
+  modifications: LeaseModification[];
 }
 
 export interface Escalation {
   escalation_start_date: string;
   escalation_percentage: number;
+}
+
+export interface LeaseModification {
+  modification_id: string;
+  modification_date: string;
+  modification_type: ModificationType;
+  effective_date: string;
+  description: string;
+  // New lease terms after modification
+  new_lease_end_date: string;
+  new_monthly_amount: number;
+  new_discount_rate: number;
+  // Termination-specific
+  termination_penalty: number;
+  // Scope decrease percentage (for proportional derecognition)
+  scope_decrease_percentage: number;
+  // Computed results (populated after computation)
+  carrying_liability_at_mod: number;
+  carrying_rou_at_mod: number;
+  new_liability: number;
+  liability_adjustment: number;
+  rou_adjustment: number;
+  gain_loss: number;
+  created_at: string;
 }
 
 export interface ScheduleRow {
@@ -67,6 +93,8 @@ export interface ScheduleRow {
   security_deposit_opening: number;
   interest_deposit: number;
   security_deposit_closing: number;
+  is_modification_point?: boolean;
+  modification_label?: string;
 }
 
 export interface LeaseComputation {
