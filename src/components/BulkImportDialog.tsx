@@ -25,6 +25,11 @@ const OPTIONAL_COLUMNS = [
   'lease_comments', 'payment_frequency', 'lease_type', 'lease_classification',
   'number_installments', 'security_deposit', 'initial_direct_cost',
   'short_term_flag', 'low_value_flag',
+  'escalation_1_date', 'escalation_1_percentage',
+  'escalation_2_date', 'escalation_2_percentage',
+  'escalation_3_date', 'escalation_3_percentage',
+  'escalation_4_date', 'escalation_4_percentage',
+  'escalation_5_date', 'escalation_5_percentage',
 ];
 
 const ALL_COLUMNS = [...REQUIRED_COLUMNS, ...OPTIONAL_COLUMNS];
@@ -149,6 +154,22 @@ export default function BulkImportDialog({ open, onOpenChange, onComplete }: Bul
         const validClass = ['Finance', 'Operating'];
         const leaseClassification = validClass.includes(classification) ? classification : 'Finance';
 
+        // Parse escalations (up to 5)
+        const escalations: { escalation_start_date: string; escalation_percentage: number }[] = [];
+        for (let e = 1; e <= 5; e++) {
+          const eDate = row[`escalation_${e}_date`]?.trim();
+          const ePct = parseFloat(row[`escalation_${e}_percentage`]);
+          if (eDate && !isNaN(ePct) && ePct > 0) {
+            escalations.push({ escalation_start_date: eDate, escalation_percentage: ePct });
+          }
+        }
+        // Validate escalation dates are sequential
+        for (let e = 1; e < escalations.length; e++) {
+          if (escalations[e].escalation_start_date <= escalations[e - 1].escalation_start_date) {
+            throw new Error(`Escalation ${e + 1} date must be after escalation ${e} date`);
+          }
+        }
+
         const lease: Lease = {
           lease_id: generateId(),
           entity_id: entityId,
@@ -176,7 +197,7 @@ export default function BulkImportDialog({ open, onOpenChange, onComplete }: Bul
           low_value_flag: row.low_value_flag?.toLowerCase() === 'true',
           status: 'Active',
           created_at: new Date().toISOString(),
-          escalations: [],
+          escalations,
           modifications: [],
         };
 
