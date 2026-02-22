@@ -15,7 +15,7 @@ Deno.serve(async (req) => {
     const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     const adminClient = createClient(supabaseUrl, serviceRoleKey)
 
-    // Check if any admin exists
+    // Check if any admin exists FIRST
     const { data: existingAdmins } = await adminClient
       .from('user_roles')
       .select('id')
@@ -29,7 +29,16 @@ Deno.serve(async (req) => {
       })
     }
 
-    const { email, password, full_name } = await req.json()
+    const body = await req.json()
+
+    // If check_only, just report that no admin exists yet
+    if (body.check_only) {
+      return new Response(JSON.stringify({ needs_setup: true }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    const { email, password, full_name } = body
     if (!email || !password) throw new Error('Email and password required')
 
     const { data: newUser, error: createError } = await adminClient.auth.admin.createUser({

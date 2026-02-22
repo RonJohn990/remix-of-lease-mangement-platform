@@ -14,15 +14,14 @@ export default function Login() {
   const [checkingSetup, setCheckingSetup] = useState(true);
 
   useEffect(() => {
-    // Check if any admin exists
-    supabase.functions.invoke('bootstrap-admin', { body: { email: '', password: '' } })
+    supabase.functions.invoke('bootstrap-admin', { body: { check_only: true } })
       .then(({ data }) => {
-        // If error says "Admin already exists" -> normal login
-        // If error is about missing fields -> no admin yet, show setup
         if (data?.error === 'Admin already exists. Use the login page.') {
           setSetupMode(false);
-        } else {
+        } else if (data?.needs_setup) {
           setSetupMode(true);
+        } else {
+          setSetupMode(false);
         }
       })
       .catch(() => setSetupMode(false))
