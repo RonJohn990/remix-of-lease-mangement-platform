@@ -118,6 +118,52 @@ export interface JournalEntry {
   debit_account: string;
   credit_account: string;
   amount: number;
+  cash_flow_classification?: 'Operating' | 'Financing' | 'Non-cash';
+}
+
+export interface DisclosureData {
+  // Maturity Analysis (Ind AS 116.58)
+  maturity_analysis: {
+    within_1_year: number;
+    between_1_and_5_years: number;
+    beyond_5_years: number;
+    total_undiscounted: number;
+    total_lease_liability: number;
+    discount_effect: number;
+  };
+  // ROU Asset Movement (Ind AS 116.53)
+  rou_movement: {
+    opening_balance: number;
+    additions: number;
+    depreciation: number;
+    modifications: number;
+    disposals: number;
+    closing_balance: number;
+  };
+  // Lease Liability Movement
+  liability_movement: {
+    opening_balance: number;
+    additions: number;
+    interest_accretion: number;
+    payments: number;
+    modifications: number;
+    disposals: number;
+    closing_balance: number;
+  };
+  // Expense Breakdown (Ind AS 116.53)
+  expense_summary: {
+    depreciation_expense: number;
+    interest_expense: number;
+    short_term_lease_expense: number;
+    low_value_lease_expense: number;
+    total_cash_outflow: number;
+  };
+  // Cash Flow Classification (Ind AS 7)
+  cash_flow: {
+    principal_payments_financing: number;
+    interest_payments_financing: number;
+    short_term_low_value_operating: number;
+  };
 }
 
 export interface DashboardStats {

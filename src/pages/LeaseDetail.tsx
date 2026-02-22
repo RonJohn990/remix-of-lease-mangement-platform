@@ -111,8 +111,8 @@ export default function LeaseDetail() {
   };
 
   const exportJournals = () => {
-    const headers = ['Date', 'Description', 'Debit Account', 'Credit Account', 'Amount'];
-    const rows = journals.map(j => [j.date, j.description, j.debit_account, j.credit_account, j.amount.toString()]);
+    const headers = ['Date', 'Description', 'Debit Account', 'Credit Account', 'Amount', 'Cash Flow Classification'];
+    const rows = journals.map(j => [j.date, j.description, j.debit_account, j.credit_account, j.amount.toString(), j.cash_flow_classification || '']);
     exportCSV(headers, rows, `${lease.lease_name}_journals.csv`);
     toast.success('Journal entries exported');
   };
@@ -319,12 +319,13 @@ export default function LeaseDetail() {
               <div className="overflow-x-auto">
                 <table className="w-full text-xs">
                   <thead>
-                    <tr className="border-b bg-muted/50">
+                     <tr className="border-b bg-muted/50">
                       <th className="px-3 py-2 text-left font-medium text-muted-foreground">Date</th>
                       <th className="px-3 py-2 text-left font-medium text-muted-foreground">Description</th>
                       <th className="px-3 py-2 text-left font-medium text-muted-foreground">Debit</th>
                       <th className="px-3 py-2 text-left font-medium text-muted-foreground">Credit</th>
                       <th className="px-3 py-2 text-right font-medium text-muted-foreground">Amount</th>
+                      <th className="px-3 py-2 text-center font-medium text-muted-foreground">Cash Flow (Ind AS 7)</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y">
@@ -335,6 +336,15 @@ export default function LeaseDetail() {
                         <td className="px-3 py-2 font-medium">{j.debit_account}</td>
                         <td className="px-3 py-2 font-medium">{j.credit_account}</td>
                         <td className="px-3 py-2 text-right">{formatCurrency(j.amount)}</td>
+                        <td className="px-3 py-2 text-center">
+                          <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                            j.cash_flow_classification === 'Financing' ? 'bg-primary/10 text-primary' :
+                            j.cash_flow_classification === 'Operating' ? 'bg-accent/10 text-accent' :
+                            'bg-muted text-muted-foreground'
+                          }`}>
+                            {j.cash_flow_classification || '—'}
+                          </span>
+                        </td>
                       </tr>
                     ))}
                   </tbody>

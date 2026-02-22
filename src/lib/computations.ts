@@ -1,4 +1,4 @@
-import { Lease, ScheduleRow, LeaseComputation, JournalEntry, LeaseModification } from './types';
+import { Lease, ScheduleRow, LeaseComputation, JournalEntry, LeaseModification, DisclosureData } from './types';
 import { differenceInDays, addMonths, addQuarters, addYears, format, parseISO, isBefore, isAfter } from 'date-fns';
 
 function getPaymentDates(startDate: string, endDate: string, frequency: string): Date[] {
@@ -344,6 +344,7 @@ export function generateJournalEntries(lease: Lease, computation: LeaseComputati
     debit_account: 'ROU Asset',
     credit_account: 'Lease Liability',
     amount: computation.initial_liability,
+    cash_flow_classification: 'Non-cash',
   });
 
   if (lease.initial_direct_cost > 0) {
@@ -353,6 +354,7 @@ export function generateJournalEntries(lease: Lease, computation: LeaseComputati
       debit_account: 'ROU Asset',
       credit_account: 'Bank/Cash',
       amount: lease.initial_direct_cost,
+      cash_flow_classification: 'Financing',
     });
   }
 
@@ -364,14 +366,29 @@ export function generateJournalEntries(lease: Lease, computation: LeaseComputati
       debit_account: 'Interest Expense',
       credit_account: 'Lease Liability',
       amount: row.interest_expense,
+      cash_flow_classification: 'Non-cash',
+    });
+
+    // Per Ind AS 7: Interest paid is classified as Financing activity
+    // The payment itself reduces liability (principal) + covers interest
+    const principalPortion = row.lease_payment - row.interest_expense;
+    
+    entries.push({
+      date: row.period_date,
+      description: `Period ${row.period} - Lease Payment (Principal)`,
+      debit_account: 'Lease Liability',
+      credit_account: 'Bank/Cash',
+      amount: round2(Math.max(principalPortion, 0)),
+      cash_flow_classification: 'Financing',
     });
 
     entries.push({
       date: row.period_date,
-      description: `Period ${row.period} - Lease Payment`,
-      debit_account: 'Lease Liability',
+      description: `Period ${row.period} - Lease Payment (Interest)`,
+      debit_account: 'Interest Expense',
       credit_account: 'Bank/Cash',
-      amount: row.lease_payment,
+      amount: round2(Math.min(row.interest_expense, row.lease_payment)),
+      cash_flow_classification: 'Financing',
     });
 
     entries.push({
@@ -380,6 +397,7 @@ export function generateJournalEntries(lease: Lease, computation: LeaseComputati
       debit_account: 'Depreciation Expense',
       credit_account: 'Accumulated Depreciation - ROU',
       amount: row.depreciation,
+      cash_flow_classification: 'Non-cash',
     });
   }
 
@@ -392,6 +410,7 @@ export function generateJournalEntries(lease: Lease, computation: LeaseComputati
         debit_account: 'Lease Liability',
         credit_account: '',
         amount: mod.carrying_liability_at_mod,
+        cash_flow_classification: 'Non-cash',
       });
       entries.push({
         date: mod.effective_date,
@@ -399,6 +418,7 @@ export function generateJournalEntries(lease: Lease, computation: LeaseComputati
         debit_account: '',
         credit_account: 'ROU Asset',
         amount: mod.carrying_rou_at_mod,
+        cash_flow_classification: 'Non-cash',
       });
       if (mod.gain_loss !== 0) {
         entries.push({
@@ -407,6 +427,7 @@ export function generateJournalEntries(lease: Lease, computation: LeaseComputati
           debit_account: mod.gain_loss < 0 ? 'Loss on Lease Termination' : '',
           credit_account: mod.gain_loss > 0 ? 'Gain on Lease Termination' : '',
           amount: Math.abs(mod.gain_loss),
+          cash_flow_classification: 'Non-cash',
         });
       }
       if (mod.termination_penalty > 0) {
@@ -416,10 +437,10 @@ export function generateJournalEntries(lease: Lease, computation: LeaseComputati
           debit_account: 'Termination Penalty Expense',
           credit_account: 'Bank/Cash',
           amount: mod.termination_penalty,
+          cash_flow_classification: 'Financing',
         });
       }
     } else {
-      // Modification adjustment
       if (mod.liability_adjustment !== 0) {
         entries.push({
           date: mod.effective_date,
@@ -427,6 +448,7 @@ export function generateJournalEntries(lease: Lease, computation: LeaseComputati
           debit_account: mod.liability_adjustment > 0 ? 'ROU Asset' : 'Lease Liability',
           credit_account: mod.liability_adjustment > 0 ? 'Lease Liability' : 'ROU Asset',
           amount: Math.abs(mod.liability_adjustment),
+          cash_flow_classification: 'Non-cash',
         });
       }
       if (mod.gain_loss !== 0) {
@@ -436,6 +458,7 @@ export function generateJournalEntries(lease: Lease, computation: LeaseComputati
           debit_account: mod.gain_loss < 0 ? 'Loss on Lease Modification' : 'Lease Liability',
           credit_account: mod.gain_loss > 0 ? 'Gain on Lease Modification' : 'ROU Asset',
           amount: Math.abs(mod.gain_loss),
+          cash_flow_classification: 'Non-cash',
         });
       }
     }
@@ -445,8 +468,136 @@ export function generateJournalEntries(lease: Lease, computation: LeaseComputati
 }
 
 export function formatCurrency(value: number): string {
-  return new Intl.NumberFormat('en-US', {
+  return new Intl.NumberFormat('en-IN', {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(value);
+}
+
+/**
+ * Compute Ind AS 116 disclosure data across all leases for a reporting date.
+ * Maturity analysis per para 58, ROU/Liability movement per para 53,
+ * Expense summary per para 53(a)-(d), Cash flow per Ind AS 7.
+ */
+export function computeDisclosures(leases: Lease[], reportingDate: string): DisclosureData {
+  const repDate = parseISO(reportingDate);
+
+  let within1 = 0, between1and5 = 0, beyond5 = 0;
+  let totalUndiscounted = 0, totalLiability = 0;
+  let rouAdditions = 0, rouDepreciation = 0, rouModifications = 0, rouDisposals = 0;
+  let liabAdditions = 0, liabInterest = 0, liabPayments = 0, liabModifications = 0, liabDisposals = 0;
+  let totalDepExpense = 0, totalIntExpense = 0;
+  let totalCashOutflow = 0;
+  let principalFinancing = 0, interestFinancing = 0;
+  let shortTermExpense = 0, lowValueExpense = 0;
+
+  for (const lease of leases) {
+    // Short-term and low-value: recognised as expense, not on balance sheet
+    if (lease.short_term_flag || lease.low_value_flag) {
+      const comp = computeLease(lease);
+      const totalPayments = comp.schedule.reduce((s, r) => s + r.lease_payment, 0);
+      if (lease.short_term_flag) shortTermExpense += totalPayments;
+      if (lease.low_value_flag) lowValueExpense += totalPayments;
+      totalCashOutflow += totalPayments;
+      continue;
+    }
+
+    try {
+      const comp = computeLease(lease);
+      const journals = generateJournalEntries(lease, comp);
+
+      // ROU & Liability additions (initial recognition)
+      rouAdditions += comp.initial_rou;
+      liabAdditions += comp.initial_liability;
+
+      // Accumulate from schedule
+      for (const row of comp.schedule) {
+        const rowDate = parseISO(row.period_date);
+
+        rouDepreciation += row.depreciation;
+        liabInterest += row.interest_expense;
+        liabPayments += row.lease_payment;
+        totalDepExpense += row.depreciation;
+        totalIntExpense += row.interest_expense;
+        totalCashOutflow += row.lease_payment;
+
+        const principal = row.lease_payment - row.interest_expense;
+        principalFinancing += Math.max(principal, 0);
+        interestFinancing += Math.min(row.interest_expense, row.lease_payment);
+
+        // Maturity analysis: future undiscounted payments from reporting date
+        if (rowDate > repDate) {
+          const yearsFromRep = differenceInDays(rowDate, repDate) / 365;
+          if (yearsFromRep <= 1) within1 += row.lease_payment;
+          else if (yearsFromRep <= 5) between1and5 += row.lease_payment;
+          else beyond5 += row.lease_payment;
+          totalUndiscounted += row.lease_payment;
+        }
+      }
+
+      // Get closing liability at reporting date for total liability
+      const lastRowBeforeRep = [...comp.schedule]
+        .filter(r => parseISO(r.period_date) <= repDate)
+        .pop();
+      if (lastRowBeforeRep) {
+        totalLiability += Math.max(lastRowBeforeRep.closing_liability, 0);
+      }
+
+      // Modification adjustments
+      for (const mod of lease.modifications || []) {
+        if (mod.modification_type === 'EARLY_TERMINATION') {
+          rouDisposals += Math.abs(mod.carrying_rou_at_mod || 0);
+          liabDisposals += Math.abs(mod.carrying_liability_at_mod || 0);
+        } else {
+          rouModifications += mod.rou_adjustment || 0;
+          liabModifications += mod.liability_adjustment || 0;
+        }
+      }
+    } catch {
+      // skip invalid
+    }
+  }
+
+  const rouClosing = rouAdditions - rouDepreciation + rouModifications - rouDisposals;
+  const liabClosing = liabAdditions + liabInterest - liabPayments + liabModifications - liabDisposals;
+
+  return {
+    maturity_analysis: {
+      within_1_year: round2(within1),
+      between_1_and_5_years: round2(between1and5),
+      beyond_5_years: round2(beyond5),
+      total_undiscounted: round2(totalUndiscounted),
+      total_lease_liability: round2(totalLiability),
+      discount_effect: round2(totalUndiscounted - totalLiability),
+    },
+    rou_movement: {
+      opening_balance: 0,
+      additions: round2(rouAdditions),
+      depreciation: round2(rouDepreciation),
+      modifications: round2(rouModifications),
+      disposals: round2(rouDisposals),
+      closing_balance: round2(rouClosing),
+    },
+    liability_movement: {
+      opening_balance: 0,
+      additions: round2(liabAdditions),
+      interest_accretion: round2(liabInterest),
+      payments: round2(liabPayments),
+      modifications: round2(liabModifications),
+      disposals: round2(liabDisposals),
+      closing_balance: round2(liabClosing),
+    },
+    expense_summary: {
+      depreciation_expense: round2(totalDepExpense),
+      interest_expense: round2(totalIntExpense),
+      short_term_lease_expense: round2(shortTermExpense),
+      low_value_lease_expense: round2(lowValueExpense),
+      total_cash_outflow: round2(totalCashOutflow),
+    },
+    cash_flow: {
+      principal_payments_financing: round2(principalFinancing),
+      interest_payments_financing: round2(interestFinancing),
+      short_term_low_value_operating: round2(shortTermExpense + lowValueExpense),
+    },
+  };
 }
