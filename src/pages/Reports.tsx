@@ -11,7 +11,9 @@ import { Download, FileSpreadsheet, Loader2, Filter } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { parseISO, isAfter, isBefore, format } from 'date-fns';
 
-type ReportType = 'schedule' | 'journal' | 'summary' | 'version_history';
+type ReportType = 'schedule' | 'journal' | 'summary' | 'version_history' | 'payment_schedule' | 'present_value';
+
+const round2 = (v: number) => Math.round(v * 100) / 100;
 
 export default function Reports() {
   const [leases, setLeases] = useState<Lease[]>([]);
@@ -146,6 +148,68 @@ export default function Reports() {
           ].join(','));
         }
       }
+    } else if (reportType === 'payment_schedule') {
+      lines.push('Lease Payment Schedule Report');
+      lines.push(periodLabel);
+      lines.push('');
+      lines.push('Lease Name,Entity,Classification,Period,Date,Days,Payment Amount,Payment Frequency,Escalation Applied,Cumulative Payments');
+
+      for (const lease of filteredLeases) {
+        try {
+          const comp = computeLease(lease);
+          let cumulative = 0;
+          for (const row of comp.schedule) {
+            if (periodFrom && isBefore(parseISO(row.period_date), parseISO(periodFrom))) continue;
+            if (periodTo && isAfter(parseISO(row.period_date), parseISO(periodTo))) continue;
+            cumulative += row.lease_payment;
+            const hasEscalation = (lease.escalations || []).some(e => !isAfter(parseISO(e.escalation_start_date), parseISO(row.period_date)));
+            lines.push([
+              `"${lease.lease_name}"`,
+              `"${lease.legal_entity_name}"`,
+              lease.lease_classification,
+              row.period,
+              row.period_date,
+              row.days_in_period,
+              row.lease_payment,
+              lease.payment_frequency,
+              hasEscalation ? 'Yes' : 'No',
+              round2(cumulative),
+            ].join(','));
+          }
+        } catch { /* skip */ }
+      }
+    } else if (reportType === 'present_value') {
+      lines.push('Present Value of Leases Report');
+      lines.push(periodLabel);
+      lines.push('');
+      lines.push('Lease Name,Entity,Classification,Start Date,End Date,Monthly Amount,Discount Rate (%),Total Undiscounted Payments,Initial PV (Liability),Initial ROU Asset,Total Interest Over Term,Total Depreciation Over Term,Net Carrying Liability (Final),PV as % of Undiscounted');
+
+      for (const lease of filteredLeases) {
+        try {
+          const comp = computeLease(lease);
+          const totalPayments = comp.schedule.reduce((s, r) => s + r.lease_payment, 0);
+          const finalLiab = comp.schedule.length > 0 ? comp.schedule[comp.schedule.length - 1].closing_liability : 0;
+          const pvPct = totalPayments > 0 ? round2((comp.initial_liability / totalPayments) * 100) : 0;
+          lines.push([
+            `"${lease.lease_name}"`,
+            `"${lease.legal_entity_name}"`,
+            lease.lease_classification,
+            lease.lease_start_date,
+            lease.lease_end_date,
+            lease.monthly_lease_amount,
+            lease.discount_rate_ibr,
+            round2(totalPayments),
+            comp.initial_liability,
+            comp.initial_rou,
+            comp.total_interest,
+            comp.total_depreciation,
+            round2(finalLiab),
+            pvPct,
+          ].join(','));
+        } catch {
+          lines.push([`"${lease.lease_name}"`, `"${lease.legal_entity_name}"`, lease.lease_classification, lease.lease_start_date, lease.lease_end_date, lease.monthly_lease_amount, lease.discount_rate_ibr, 'Error', '', '', '', '', '', ''].join(','));
+        }
+      }
     } else if (reportType === 'schedule') {
       lines.push('Lease Schedule Report');
       lines.push(periodLabel);
@@ -214,7 +278,7 @@ export default function Reports() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    const typeLabel = reportType === 'summary' ? 'Summary' : reportType === 'schedule' ? 'Schedule' : reportType === 'version_history' ? 'VersionHistory' : 'JournalEntries';
+    const typeLabel = reportType === 'summary' ? 'Summary' : reportType === 'schedule' ? 'Schedule' : reportType === 'version_history' ? 'VersionHistory' : reportType === 'payment_schedule' ? 'PaymentSchedule' : reportType === 'present_value' ? 'PresentValue' : 'JournalEntries';
     a.download = `IndAS116_${typeLabel}_${format(new Date(), 'yyyyMMdd')}.csv`;
     a.click();
     URL.revokeObjectURL(url);
@@ -303,6 +367,8 @@ export default function Reports() {
                 <SelectItem value="summary">Lease Summary</SelectItem>
                 <SelectItem value="version_history">Version History</SelectItem>
                 <SelectItem value="schedule">Amortisation Schedule</SelectItem>
+                <SelectItem value="payment_schedule">Payment Schedule</SelectItem>
+                <SelectItem value="present_value">Present Value of Leases</SelectItem>
                 <SelectItem value="journal">Journal Entries</SelectItem>
               </SelectContent>
             </Select>
@@ -315,7 +381,7 @@ export default function Reports() {
         <div className="flex items-center justify-between px-4 py-3 border-b bg-muted/30">
           <div className="flex items-center gap-2">
             <h3 className="text-sm font-semibold">
-              {reportType === 'summary' ? 'Lease Summary' : reportType === 'schedule' ? 'Amortisation Schedule' : reportType === 'version_history' ? 'Version History' : 'Journal Entries'}
+              {reportType === 'summary' ? 'Lease Summary' : reportType === 'schedule' ? 'Amortisation Schedule' : reportType === 'version_history' ? 'Version History' : reportType === 'payment_schedule' ? 'Payment Schedule' : reportType === 'present_value' ? 'Present Value of Leases' : 'Journal Entries'}
             </h3>
             <Badge variant="secondary" className="text-[10px]">{filteredLeases.length} leases</Badge>
           </div>
