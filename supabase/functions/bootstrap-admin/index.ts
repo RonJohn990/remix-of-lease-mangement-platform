@@ -15,6 +15,8 @@ Deno.serve(async (req) => {
     const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     const adminClient = createClient(supabaseUrl, serviceRoleKey)
 
+    const body = await req.json()
+
     // Check if any admin exists FIRST
     const { data: existingAdmins } = await adminClient
       .from('user_roles')
@@ -22,18 +24,19 @@ Deno.serve(async (req) => {
       .eq('role', 'admin')
       .limit(1)
 
-    if (existingAdmins && existingAdmins.length > 0) {
-      return new Response(JSON.stringify({ error: 'Admin already exists. Use the login page.' }), {
-        status: 400,
+    const adminExists = existingAdmins && existingAdmins.length > 0
+
+    // If check_only, return setup status with 200
+    if (body.check_only) {
+      return new Response(JSON.stringify({ needs_setup: !adminExists }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
 
-    const body = await req.json()
-
-    // If check_only, just report that no admin exists yet
-    if (body.check_only) {
-      return new Response(JSON.stringify({ needs_setup: true }), {
+    // For actual creation, block if admin exists
+    if (adminExists) {
+      return new Response(JSON.stringify({ error: 'Admin already exists. Use the login page.' }), {
+        status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
