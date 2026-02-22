@@ -10,6 +10,11 @@ export interface Entity {
   entity_id: string;
   corporate_id: string;
   legal_entity_name: string;
+  address: string;
+  location: string;
+  pin_code: string;
+  financial_year_start: string;
+  financial_year_end: string;
   created_at: string;
 }
 
