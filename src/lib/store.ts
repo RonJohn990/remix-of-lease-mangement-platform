@@ -39,12 +39,7 @@ export async function getEntities(): Promise<Entity[]> {
     .select('*')
     .order('created_at', { ascending: true });
   if (error) throw error;
-  return (data || []).map(row => ({
-    entity_id: row.entity_id,
-    corporate_id: row.corporate_id,
-    legal_entity_name: row.legal_entity_name,
-    created_at: row.created_at,
-  }));
+  return (data || []).map(mapRowToEntity);
 }
 
 export async function getEntitiesByGroup(corporateId: string): Promise<Entity[]> {
@@ -54,12 +49,7 @@ export async function getEntitiesByGroup(corporateId: string): Promise<Entity[]>
     .eq('corporate_id', corporateId)
     .order('created_at', { ascending: true });
   if (error) throw error;
-  return (data || []).map(row => ({
-    entity_id: row.entity_id,
-    corporate_id: row.corporate_id,
-    legal_entity_name: row.legal_entity_name,
-    created_at: row.created_at,
-  }));
+  return (data || []).map(mapRowToEntity);
 }
 
 export async function saveEntity(entity: Entity): Promise<void> {
@@ -69,8 +59,27 @@ export async function saveEntity(entity: Entity): Promise<void> {
       entity_id: entity.entity_id,
       corporate_id: entity.corporate_id,
       legal_entity_name: entity.legal_entity_name,
+      address: entity.address,
+      location: entity.location,
+      pin_code: entity.pin_code,
+      financial_year_start: entity.financial_year_start,
+      financial_year_end: entity.financial_year_end,
     }, { onConflict: 'entity_id' });
   if (error) throw error;
+}
+
+function mapRowToEntity(row: any): Entity {
+  return {
+    entity_id: row.entity_id,
+    corporate_id: row.corporate_id,
+    legal_entity_name: row.legal_entity_name || '',
+    address: row.address || '',
+    location: row.location || '',
+    pin_code: row.pin_code || '',
+    financial_year_start: row.financial_year_start || '04-01',
+    financial_year_end: row.financial_year_end || '03-31',
+    created_at: row.created_at,
+  };
 }
 
 export async function deleteEntity(id: string): Promise<void> {

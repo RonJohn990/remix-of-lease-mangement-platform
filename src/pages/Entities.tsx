@@ -5,10 +5,14 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Building2, Building, Plus, Trash2, Edit2, Loader2 } from 'lucide-react';
+import { Building2, Building, Plus, Trash2, Edit2, Loader2, MapPin } from 'lucide-react';
 import { toast } from 'sonner';
+import { useLocation } from 'react-router-dom';
 
 export default function Entities() {
+  const location = useLocation();
+  const isGroupsView = location.pathname === '/master/groups';
+
   const [groups, setGroups] = useState<CorporateGroup[]>([]);
   const [entities, setEntities] = useState<Entity[]>([]);
   const [loading, setLoading] = useState(true);
@@ -17,8 +21,15 @@ export default function Entities() {
   const [editGroup, setEditGroup] = useState<CorporateGroup | null>(null);
   const [editEntity, setEditEntity] = useState<Entity | null>(null);
   const [groupName, setGroupName] = useState('');
+
+  // Entity form state
   const [entityName, setEntityName] = useState('');
   const [selectedGroupId, setSelectedGroupId] = useState('');
+  const [entityAddress, setEntityAddress] = useState('');
+  const [entityLocation, setEntityLocation] = useState('');
+  const [entityPinCode, setEntityPinCode] = useState('');
+  const [entityFYStart, setEntityFYStart] = useState('04-01');
+  const [entityFYEnd, setEntityFYEnd] = useState('03-31');
   const [saving, setSaving] = useState(false);
 
   const reload = async () => {
@@ -49,24 +60,38 @@ export default function Entities() {
   };
 
   const handleSaveEntity = async () => {
-    if (!entityName.trim() || !selectedGroupId) { toast.error('All fields are required'); return; }
+    if (!entityName.trim() || !selectedGroupId) { toast.error('Name and group are required'); return; }
     setSaving(true);
     try {
       await saveEntity({
         entity_id: editEntity?.entity_id || generateId(),
         corporate_id: selectedGroupId,
         legal_entity_name: entityName.trim(),
+        address: entityAddress,
+        location: entityLocation,
+        pin_code: entityPinCode,
+        financial_year_start: entityFYStart,
+        financial_year_end: entityFYEnd,
         created_at: editEntity?.created_at || new Date().toISOString(),
       });
       setEntityDialog(false);
-      setEditEntity(null);
-      setEntityName('');
-      setSelectedGroupId('');
+      resetEntityForm();
       await reload();
       toast.success('Entity saved');
     } catch (e: any) {
       toast.error(e.message || 'Failed to save');
     } finally { setSaving(false); }
+  };
+
+  const resetEntityForm = () => {
+    setEditEntity(null);
+    setEntityName('');
+    setSelectedGroupId('');
+    setEntityAddress('');
+    setEntityLocation('');
+    setEntityPinCode('');
+    setEntityFYStart('04-01');
+    setEntityFYEnd('03-31');
   };
 
   const handleDeleteGroup = async (id: string) => {
@@ -99,6 +124,11 @@ export default function Entities() {
     setEditEntity(e);
     setEntityName(e.legal_entity_name);
     setSelectedGroupId(e.corporate_id);
+    setEntityAddress(e.address);
+    setEntityLocation(e.location);
+    setEntityPinCode(e.pin_code);
+    setEntityFYStart(e.financial_year_start);
+    setEntityFYEnd(e.financial_year_end);
     setEntityDialog(true);
   };
 
@@ -112,36 +142,44 @@ export default function Entities() {
     <div className="page-container animate-fade-in">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="page-title">Entity Management</h1>
-          <p className="text-sm text-muted-foreground">Manage corporate groups and legal entities</p>
+          <h1 className="page-title">{isGroupsView ? 'Corporate Groups' : 'Legal Entities'}</h1>
+          <p className="text-sm text-muted-foreground">
+            {isGroupsView ? 'Manage corporate group structure' : 'Manage legal entities and their details'}
+          </p>
         </div>
         <div className="flex gap-2">
-          <Button size="sm" variant="outline" onClick={() => { setEditGroup(null); setGroupName(''); setGroupDialog(true); }}>
-            <Building className="w-4 h-4 mr-1.5" /> Add Group
-          </Button>
-          <Button size="sm" onClick={() => { setEditEntity(null); setEntityName(''); setSelectedGroupId(''); setEntityDialog(true); }}>
-            <Plus className="w-4 h-4 mr-1.5" /> Add Entity
-          </Button>
+          {isGroupsView ? (
+            <Button size="sm" onClick={() => { setEditGroup(null); setGroupName(''); setGroupDialog(true); }}>
+              <Plus className="w-4 h-4 mr-1.5" /> Add Group
+            </Button>
+          ) : (
+            <Button size="sm" onClick={() => { resetEntityForm(); setEntityDialog(true); }}>
+              <Plus className="w-4 h-4 mr-1.5" /> Add Entity
+            </Button>
+          )}
         </div>
       </div>
 
-      {groups.length === 0 ? (
-        <div className="bg-card border rounded-lg p-8 text-center">
-          <Building className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
-          <h3 className="text-lg font-semibold mb-1">No corporate groups</h3>
-          <p className="text-sm text-muted-foreground">Create a corporate group to get started.</p>
-        </div>
-      ) : (
-        <div className="space-y-4">
-          {groups.map(group => {
-            const groupEntities = entities.filter(e => e.corporate_id === group.corporate_id);
-            return (
-              <div key={group.corporate_id} className="bg-card border rounded-lg overflow-hidden">
-                <div className="flex items-center justify-between px-5 py-3 border-b bg-muted/50">
-                  <div className="flex items-center gap-2">
-                    <Building className="w-4 h-4 text-primary" />
-                    <span className="font-semibold text-sm">{group.corporate_group_name}</span>
-                    <span className="text-xs text-muted-foreground ml-2">{groupEntities.length} entities</span>
+      {isGroupsView ? (
+        /* Groups View */
+        groups.length === 0 ? (
+          <div className="bg-card border rounded-lg p-8 text-center">
+            <Building className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
+            <h3 className="text-lg font-semibold mb-1">No corporate groups</h3>
+            <p className="text-sm text-muted-foreground">Create a corporate group to get started.</p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {groups.map(group => {
+              const count = entities.filter(e => e.corporate_id === group.corporate_id).length;
+              return (
+                <div key={group.corporate_id} className="bg-card border rounded-lg flex items-center justify-between px-5 py-4">
+                  <div className="flex items-center gap-3">
+                    <Building className="w-5 h-5 text-primary" />
+                    <div>
+                      <span className="font-semibold text-sm">{group.corporate_group_name}</span>
+                      <p className="text-xs text-muted-foreground">{count} entities</p>
+                    </div>
                   </div>
                   <div className="flex gap-1">
                     <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEditGroup(group)}>
@@ -152,15 +190,54 @@ export default function Entities() {
                     </Button>
                   </div>
                 </div>
-                {groupEntities.length > 0 ? (
-                  <div className="divide-y">
-                    {groupEntities.map(entity => (
-                      <div key={entity.entity_id} className="flex items-center justify-between px-5 py-2.5">
+              );
+            })}
+          </div>
+        )
+      ) : (
+        /* Entities View */
+        entities.length === 0 ? (
+          <div className="bg-card border rounded-lg p-8 text-center">
+            <Building2 className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
+            <h3 className="text-lg font-semibold mb-1">No entities</h3>
+            <p className="text-sm text-muted-foreground">Create a legal entity to get started.</p>
+          </div>
+        ) : (
+          <div className="bg-card border rounded-lg overflow-hidden">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b bg-muted/50">
+                  <th className="text-left px-5 py-3 font-medium text-muted-foreground">Entity</th>
+                  <th className="text-left px-5 py-3 font-medium text-muted-foreground">Group</th>
+                  <th className="text-left px-5 py-3 font-medium text-muted-foreground">Location</th>
+                  <th className="text-left px-5 py-3 font-medium text-muted-foreground">Financial Year</th>
+                  <th className="text-right px-5 py-3 font-medium text-muted-foreground">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {entities.map(entity => {
+                  const group = groups.find(g => g.corporate_id === entity.corporate_id);
+                  return (
+                    <tr key={entity.entity_id}>
+                      <td className="px-5 py-3">
                         <div className="flex items-center gap-2">
-                          <Building2 className="w-4 h-4 text-accent" />
-                          <span className="text-sm">{entity.legal_entity_name}</span>
+                          <Building2 className="w-4 h-4 text-accent shrink-0" />
+                          <span className="font-medium">{entity.legal_entity_name}</span>
                         </div>
-                        <div className="flex gap-1">
+                      </td>
+                      <td className="px-5 py-3 text-muted-foreground">{group?.corporate_group_name || '—'}</td>
+                      <td className="px-5 py-3">
+                        <div className="flex items-center gap-1 text-muted-foreground">
+                          <MapPin className="w-3.5 h-3.5" />
+                          <span>{entity.location || entity.address || '—'}</span>
+                          {entity.pin_code && <span className="text-xs">({entity.pin_code})</span>}
+                        </div>
+                      </td>
+                      <td className="px-5 py-3 text-muted-foreground">
+                        {entity.financial_year_start} to {entity.financial_year_end}
+                      </td>
+                      <td className="px-5 py-3 text-right">
+                        <div className="flex gap-1 justify-end">
                           <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEditEntity(entity)}>
                             <Edit2 className="w-3.5 h-3.5" />
                           </Button>
@@ -168,18 +245,17 @@ export default function Entities() {
                             <Trash2 className="w-3.5 h-3.5" />
                           </Button>
                         </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="px-5 py-3 text-xs text-muted-foreground">No entities in this group yet.</p>
-                )}
-              </div>
-            );
-          })}
-        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )
       )}
 
+      {/* Group Dialog */}
       <Dialog open={groupDialog} onOpenChange={setGroupDialog}>
         <DialogContent>
           <DialogHeader>
@@ -193,8 +269,9 @@ export default function Entities() {
         </DialogContent>
       </Dialog>
 
+      {/* Entity Dialog */}
       <Dialog open={entityDialog} onOpenChange={setEntityDialog}>
-        <DialogContent>
+        <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>{editEntity ? 'Edit' : 'New'} Legal Entity</DialogTitle>
           </DialogHeader>
@@ -208,6 +285,21 @@ export default function Entities() {
               </SelectContent>
             </Select>
             <Input placeholder="Entity name" value={entityName} onChange={e => setEntityName(e.target.value)} />
+            <Input placeholder="Address" value={entityAddress} onChange={e => setEntityAddress(e.target.value)} />
+            <div className="grid grid-cols-2 gap-3">
+              <Input placeholder="Location / City" value={entityLocation} onChange={e => setEntityLocation(e.target.value)} />
+              <Input placeholder="Pin code" value={entityPinCode} onChange={e => setEntityPinCode(e.target.value)} />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs font-medium text-muted-foreground">FY Start (MM-DD)</label>
+                <Input placeholder="04-01" value={entityFYStart} onChange={e => setEntityFYStart(e.target.value)} className="mt-1" />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-muted-foreground">FY End (MM-DD)</label>
+                <Input placeholder="03-31" value={entityFYEnd} onChange={e => setEntityFYEnd(e.target.value)} className="mt-1" />
+              </div>
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setEntityDialog(false)}>Cancel</Button>
