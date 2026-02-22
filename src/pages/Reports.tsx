@@ -72,7 +72,7 @@ export default function Reports() {
       lines.push('Lease Summary Report');
       lines.push(periodLabel);
       lines.push('');
-      lines.push('Lease Name,Entity,Lease Type,Classification,Status,Current Version,No. of Amendments,Amendment Dates,Start Date,End Date,Monthly Amount,Discount Rate,Initial Liability,Initial ROU,Total Interest,Total Depreciation');
+      lines.push('Lease Name,Entity,Lease Type,Classification,Status,Current Version,Lease Event,No. of Amendments,Amendment Dates,Start Date,End Date,Monthly Amount,Discount Rate,Initial Liability,Initial ROU,Total Interest,Total Depreciation');
 
       for (const lease of filteredLeases) {
         const vi = getVersionInfo(lease);
@@ -85,6 +85,7 @@ export default function Reports() {
             lease.lease_classification,
             lease.status,
             vi.currentVersion,
+            lease.lease_event,
             vi.modCount,
             `"${vi.amendmentDates.join('; ')}"`,
             lease.lease_start_date,
@@ -97,7 +98,7 @@ export default function Reports() {
             comp.total_depreciation,
           ].join(','));
         } catch {
-          lines.push([`"${lease.lease_name}"`, `"${lease.legal_entity_name}"`, lease.lease_type, lease.lease_classification, lease.status, vi.currentVersion, vi.modCount, `"${vi.amendmentDates.join('; ')}"`, lease.lease_start_date, lease.lease_end_date, lease.monthly_lease_amount, lease.discount_rate_ibr, 'Error', '', '', ''].join(','));
+          lines.push([`"${lease.lease_name}"`, `"${lease.legal_entity_name}"`, lease.lease_type, lease.lease_classification, lease.status, vi.currentVersion, lease.lease_event, vi.modCount, `"${vi.amendmentDates.join('; ')}"`, lease.lease_start_date, lease.lease_end_date, lease.monthly_lease_amount, lease.discount_rate_ibr, 'Error', '', '', ''].join(','));
         }
       }
     } else if (reportType === 'version_history') {
@@ -339,6 +340,7 @@ export default function Reports() {
                   <th className="px-3 py-2 text-left font-medium">Type</th>
                   <th className="px-3 py-2 text-left font-medium">Classification</th>
                   <th className="px-3 py-2 text-center font-medium">Version</th>
+                  <th className="px-3 py-2 text-left font-medium">Lease Event</th>
                   <th className="px-3 py-2 text-center font-medium">Amendments</th>
                   <th className="px-3 py-2 text-left font-medium">Status</th>
                   <th className="px-3 py-2 text-right font-medium">Initial Liability</th>
@@ -361,6 +363,11 @@ export default function Reports() {
                     </td>
                     <td className="px-3 py-2 text-center">
                       <Badge variant="outline" className="text-[10px]">v{vi.currentVersion}</Badge>
+                    </td>
+                    <td className="px-3 py-2">
+                      <Badge variant={lease.lease_event === 'TERMINATION' ? 'destructive' : lease.lease_event === 'MODIFICATION' ? 'secondary' : 'outline'} className="text-[10px]">
+                        {lease.lease_event}
+                      </Badge>
                     </td>
                     <td className="px-3 py-2 text-center">
                       {vi.modCount > 0 ? (
@@ -392,7 +399,7 @@ export default function Reports() {
               {!previewData.some(d => d.error) && previewData.length > 1 && (
                 <tfoot>
                   <tr className="border-t font-semibold bg-muted/20">
-                    <td className="px-3 py-2" colSpan={7}>Total</td>
+                    <td className="px-3 py-2" colSpan={8}>Total</td>
                     <td className="px-3 py-2 text-right font-mono tabular-nums">
                       {formatCurrency(previewData.reduce((s, d) => s + (d.comp?.initial_liability || 0), 0))}
                     </td>
