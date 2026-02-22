@@ -5,14 +5,16 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Search, Trash2, Eye, Edit2, FileText, Loader2 } from 'lucide-react';
+import { Plus, Search, Trash2, Eye, Edit2, FileText, Loader2, Upload } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatCurrency } from '@/lib/computations';
+import BulkImportDialog from '@/components/BulkImportDialog';
 
 export default function Leases() {
   const [leases, setLeases] = useState<Lease[]>([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
+  const [bulkOpen, setBulkOpen] = useState(false);
   const navigate = useNavigate();
 
   const reload = async () => {
@@ -51,10 +53,17 @@ export default function Leases() {
           <h1 className="page-title">Lease Management</h1>
           <p className="text-sm text-muted-foreground">View and manage all leases</p>
         </div>
-        <Button size="sm" onClick={() => navigate('/leases/new')}>
-          <Plus className="w-4 h-4 mr-1.5" /> New Lease
-        </Button>
+        <div className="flex gap-2">
+          <Button size="sm" variant="outline" onClick={() => setBulkOpen(true)}>
+            <Upload className="w-4 h-4 mr-1.5" /> Bulk Import
+          </Button>
+          <Button size="sm" onClick={() => navigate('/leases/new')}>
+            <Plus className="w-4 h-4 mr-1.5" /> New Lease
+          </Button>
+        </div>
       </div>
+
+      <BulkImportDialog open={bulkOpen} onOpenChange={setBulkOpen} onComplete={reload} />
 
       <div className="data-table-container">
         <div className="px-4 py-3 border-b flex items-center gap-3">
