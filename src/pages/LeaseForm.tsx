@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Lease, Entity, Escalation, PaymentFrequency } from '@/lib/types';
+import { Lease, Entity, Escalation, PaymentFrequency, LeaseClassification } from '@/lib/types';
 import { getEntities, getLease, saveLease, generateId } from '@/lib/store';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -17,6 +17,7 @@ const defaultLease: Partial<Lease> = {
   lease_event: 'INITIAL',
   payment_frequency: 'Monthly',
   lease_type: '',
+  lease_classification: 'Finance',
   discount_rate_ibr: 8,
   monthly_lease_amount: 0,
   number_installments: 12,
@@ -180,6 +181,16 @@ export default function LeaseForm() {
                   {assetLocations.length === 0 && (
                     <SelectItem value="" disabled>No locations defined — add in Configuration</SelectItem>
                   )}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Lease Classification *</Label>
+              <Select value={form.lease_classification || 'Finance'} onValueChange={(v: LeaseClassification) => update('lease_classification', v)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Finance">Finance Lease</SelectItem>
+                  <SelectItem value="Operating">Operating Lease</SelectItem>
                 </SelectContent>
               </Select>
             </div>

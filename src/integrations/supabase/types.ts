@@ -121,6 +121,7 @@ export type Database = {
           entity_id: string
           escalations: Json
           initial_direct_cost: number
+          lease_classification: string
           lease_comments: string
           lease_end_date: string
           lease_event: string
@@ -150,6 +151,7 @@ export type Database = {
           entity_id: string
           escalations?: Json
           initial_direct_cost?: number
+          lease_classification?: string
           lease_comments?: string
           lease_end_date: string
           lease_event?: string
@@ -179,6 +181,7 @@ export type Database = {
           entity_id?: string
           escalations?: Json
           initial_direct_cost?: number
+          lease_classification?: string
           lease_comments?: string
           lease_end_date?: string
           lease_event?: string

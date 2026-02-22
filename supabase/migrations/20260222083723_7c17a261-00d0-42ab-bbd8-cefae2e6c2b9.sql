@@ -1,0 +1,1 @@
+ALTER TABLE public.leases ADD COLUMN lease_classification text NOT NULL DEFAULT 'Finance';
