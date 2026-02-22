@@ -2,49 +2,49 @@
 @tailwind components;
 @tailwind utilities;
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=EYInterstate:wght@300;400;500;700&family=Inter:wght@300;400;500;600;700&display=swap');
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 0 0% 8%;
+    --background: 0 0% 97%;
+    --foreground: 0 0% 10%;
 
     --card: 0 0% 100%;
-    --card-foreground: 0 0% 8%;
+    --card-foreground: 0 0% 10%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 8%;
+    --popover-foreground: 0 0% 10%;
 
-    --primary: 215 80% 28%;
-    --primary-foreground: 0 0% 100%;
+    --primary: 50 100% 50%;
+    --primary-foreground: 0 0% 10%;
 
-    --secondary: 215 30% 93%;
-    --secondary-foreground: 0 0% 12%;
+    --secondary: 0 0% 92%;
+    --secondary-foreground: 0 0% 15%;
 
-    --muted: 215 20% 95%;
-    --muted-foreground: 215 10% 42%;
+    --muted: 0 0% 94%;
+    --muted-foreground: 0 0% 40%;
 
-    --accent: 215 80% 28%;
-    --accent-foreground: 0 0% 100%;
+    --accent: 50 100% 50%;
+    --accent-foreground: 0 0% 10%;
 
     --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 215 20% 85%;
-    --input: 215 20% 85%;
-    --ring: 215 80% 28%;
+    --border: 0 0% 87%;
+    --input: 0 0% 87%;
+    --ring: 50 100% 45%;
 
-    --radius: 0.5rem;
+    --radius: 0.375rem;
 
-    --sidebar-background: 215 80% 20%;
-    --sidebar-foreground: 210 20% 90%;
-    --sidebar-primary: 210 60% 70%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 215 70% 26%;
-    --sidebar-accent-foreground: 0 0% 98%;
-    --sidebar-border: 215 60% 28%;
-    --sidebar-ring: 210 60% 70%;
-    --sidebar-muted: 210 15% 55%;
+    --sidebar-background: 0 0% 8%;
+    --sidebar-foreground: 0 0% 85%;
+    --sidebar-primary: 50 100% 50%;
+    --sidebar-primary-foreground: 0 0% 8%;
+    --sidebar-accent: 0 0% 15%;
+    --sidebar-accent-foreground: 0 0% 95%;
+    --sidebar-border: 0 0% 18%;
+    --sidebar-ring: 50 100% 50%;
+    --sidebar-muted: 0 0% 50%;
 
     --success: 152 60% 40%;
     --success-foreground: 0 0% 100%;
@@ -53,8 +53,8 @@
     --info: 210 70% 50%;
     --info-foreground: 0 0% 100%;
 
-    --chart-1: 215 80% 28%;
-    --chart-2: 210 70% 50%;
+    --chart-1: 50 100% 50%;
+    --chart-2: 0 0% 25%;
     --chart-3: 152 60% 40%;
     --chart-4: 38 92% 50%;
     --chart-5: 0 72% 51%;
@@ -68,7 +68,6 @@
 
   body {
     @apply bg-background text-foreground font-sans antialiased;
-    font-family: 'Inter', system-ui, sans-serif;
   }
 
   h1, h2, h3, h4, h5, h6 {
@@ -78,7 +77,7 @@
 
 @layer components {
   .page-container {
-    @apply p-6 max-w-[1400px] mx-auto;
+    @apply p-6 lg:p-8 max-w-[1400px] mx-auto;
   }
 
   .page-title {
@@ -90,10 +89,10 @@
   }
 
   .stat-card {
-    @apply bg-card rounded-lg border p-5 shadow-sm;
+    @apply bg-card rounded-md border p-5 shadow-sm hover:shadow-md transition-shadow;
   }
 
   .data-table-container {
-    @apply bg-card rounded-lg border shadow-sm overflow-hidden;
+    @apply bg-card rounded-md border shadow-sm overflow-hidden;
   }
 }
