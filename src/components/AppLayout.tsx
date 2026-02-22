@@ -1,5 +1,6 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { Building2, LayoutDashboard, FileText, ChevronLeft, ChevronRight, Users, Database, LogOut, FileBarChart, Settings, FileSpreadsheet } from 'lucide-react';
+import ubLogo from '@/assets/ub-logo.png';
 import { useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 
@@ -39,9 +40,7 @@ export default function AppLayout() {
       >
         {/* Logo area */}
         <div className="flex items-center gap-3 px-4 h-14 border-b border-sidebar-border">
-          <div className="h-7 w-7 rounded bg-primary flex items-center justify-center shrink-0">
-            <span className="text-primary-foreground font-bold text-xs">EY</span>
-          </div>
+          <img src={ubLogo} alt="UB Logo" className="h-8 w-auto shrink-0 brightness-0 invert" />
           {!collapsed && (
             <span className="font-bold text-sm text-sidebar-accent-foreground tracking-tight leading-tight">
               Lease Manager
