@@ -1,4 +1,4 @@
-// IFRS 16 Lease Management Types
+// IFRS 16 / Ind AS 116 Lease Management Types
 
 export interface CorporateGroup {
   corporate_id: string;

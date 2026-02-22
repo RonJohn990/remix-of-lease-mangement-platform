@@ -114,7 +114,7 @@ export default function LeaseForm() {
         </Button>
         <div>
           <h1 className="page-title">{isEdit ? 'Edit Lease' : 'New Lease'}</h1>
-          <p className="text-sm text-muted-foreground">IFRS 16 compliant lease entry</p>
+          <p className="text-sm text-muted-foreground">IFRS 16 / Ind AS 116 compliant lease entry</p>
         </div>
       </div>
 

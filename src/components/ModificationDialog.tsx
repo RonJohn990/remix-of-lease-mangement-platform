@@ -89,7 +89,7 @@ export default function ModificationDialog({ open, onClose, onSave, currentEndDa
             Lease Modification
           </DialogTitle>
           <DialogDescription>
-            Record a modification per IFRS 16.44–46. The system will recalculate liability, ROU, and gain/loss.
+            Record a modification per IFRS 16.44–46 / Ind AS 116. The system will recalculate liability, ROU, and gain/loss.
           </DialogDescription>
         </DialogHeader>
 

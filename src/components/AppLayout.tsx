@@ -38,7 +38,7 @@ export default function AppLayout() {
           <Building className="w-6 h-6 text-sidebar-primary shrink-0" />
           {!collapsed && (
             <span className="font-bold text-sm text-sidebar-accent-foreground tracking-wide">
-              IFRS 16 Lease Manager
+              IFRS 16 / Ind AS 116
             </span>
           )}
         </div>
