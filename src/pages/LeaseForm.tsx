@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Lease, Entity, Escalation, PaymentFrequency } from '@/lib/types';
 import { getEntities, getLease, saveLease, generateId } from '@/lib/store';
+import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -15,7 +16,7 @@ const defaultLease: Partial<Lease> = {
   lease_version: 1,
   lease_event: 'INITIAL',
   payment_frequency: 'Monthly',
-  lease_type: 'Finance',
+  lease_type: '',
   discount_rate_ibr: 8,
   monthly_lease_amount: 0,
   number_installments: 12,
@@ -33,14 +34,22 @@ export default function LeaseForm() {
   const navigate = useNavigate();
   const isEdit = id && id !== 'new';
   const [entities, setEntities] = useState<Entity[]>([]);
+  const [leaseTypes, setLeaseTypes] = useState<string[]>([]);
+  const [assetLocations, setAssetLocations] = useState<string[]>([]);
   const [form, setForm] = useState<Partial<Lease>>(defaultLease);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     const load = async () => {
-      const ents = await getEntities();
+      const [ents, ltRes, alRes] = await Promise.all([
+        getEntities(),
+        supabase.from('lease_types').select('lease_type_name').order('created_at'),
+        supabase.from('asset_locations').select('location_name').order('created_at'),
+      ]);
       setEntities(ents);
+      setLeaseTypes((ltRes.data || []).map((r: any) => r.lease_type_name));
+      setAssetLocations((alRes.data || []).map((r: any) => r.location_name));
       if (isEdit) {
         const lease = await getLease(id!);
         if (lease) setForm(lease);
@@ -144,15 +153,35 @@ export default function LeaseForm() {
             </div>
             <div>
               <Label>Lease Type</Label>
-              <Input value={form.lease_type || ''} onChange={e => update('lease_type', e.target.value)} />
+              <Select value={form.lease_type || ''} onValueChange={v => update('lease_type', v)}>
+                <SelectTrigger className="mt-1"><SelectValue placeholder="Select lease type" /></SelectTrigger>
+                <SelectContent>
+                  {leaseTypes.map(lt => (
+                    <SelectItem key={lt} value={lt}>{lt}</SelectItem>
+                  ))}
+                  {leaseTypes.length === 0 && (
+                    <SelectItem value="" disabled>No types defined — add in Configuration</SelectItem>
+                  )}
+                </SelectContent>
+              </Select>
             </div>
             <div>
               <Label>Tagged Employee</Label>
               <Input value={form.tagged_employee || ''} onChange={e => update('tagged_employee', e.target.value)} />
             </div>
             <div>
-              <Label>Asset Unit</Label>
-              <Input value={form.asset_unit || ''} onChange={e => update('asset_unit', e.target.value)} />
+              <Label>Asset Location</Label>
+              <Select value={form.asset_unit || ''} onValueChange={v => update('asset_unit', v)}>
+                <SelectTrigger className="mt-1"><SelectValue placeholder="Select asset location" /></SelectTrigger>
+                <SelectContent>
+                  {assetLocations.map(al => (
+                    <SelectItem key={al} value={al}>{al}</SelectItem>
+                  ))}
+                  {assetLocations.length === 0 && (
+                    <SelectItem value="" disabled>No locations defined — add in Configuration</SelectItem>
+                  )}
+                </SelectContent>
+              </Select>
             </div>
             <div>
               <Label>Concerned Person</Label>

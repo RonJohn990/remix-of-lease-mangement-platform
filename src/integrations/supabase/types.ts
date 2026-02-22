@@ -14,6 +14,24 @@ export type Database = {
   }
   public: {
     Tables: {
+      asset_locations: {
+        Row: {
+          created_at: string
+          id: string
+          location_name: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          location_name: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          location_name?: string
+        }
+        Relationships: []
+      }
       corporate_groups: {
         Row: {
           corporate_group_name: string
@@ -75,6 +93,24 @@ export type Database = {
             referencedColumns: ["corporate_id"]
           },
         ]
+      }
+      lease_types: {
+        Row: {
+          created_at: string
+          id: string
+          lease_type_name: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          lease_type_name: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          lease_type_name?: string
+        }
+        Relationships: []
       }
       leases: {
         Row: {
