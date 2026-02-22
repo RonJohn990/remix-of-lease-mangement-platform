@@ -29,8 +29,8 @@ export default function Dashboard() {
 
   return (
     <div className="page-container animate-fade-in">
-      <h1 className="page-title">Dashboard</h1>
-      <p className="page-subtitle">IFRS 16 / Ind AS 116 Lease Portfolio Overview</p>
+      <h1 className="page-title">UB Lease Portfolio Overview</h1>
+      <p className="page-subtitle">IFRS 16 / Ind AS 116 Lease Management</p>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         {statCards.map(({ key, label, icon: Icon, color }) => (

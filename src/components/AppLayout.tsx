@@ -1,5 +1,6 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
-import { Building2, LayoutDashboard, FileText, Building, ChevronLeft, ChevronRight, Users, Database, LogOut, FileBarChart, Settings, FileSpreadsheet } from 'lucide-react';
+import { Building2, LayoutDashboard, FileText, ChevronLeft, ChevronRight, Users, Database, LogOut, FileBarChart, Settings, FileSpreadsheet } from 'lucide-react';
+import ubLogo from '@/assets/ub-logo.png';
 import { useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
@@ -13,7 +14,7 @@ const mainItems = [
 
 const masterDataItems = [
   { to: '/master/users', icon: Users, label: 'Users', adminOnly: true },
-  { to: '/master/groups', icon: Building, label: 'Corporate Groups' },
+  { to: '/master/groups', icon: Building2, label: 'Corporate Groups' },
   { to: '/master/entities', icon: Building2, label: 'Entities' },
   { to: '/master/config', icon: Settings, label: 'Configuration', adminOnly: true },
 ];
@@ -38,10 +39,10 @@ export default function AppLayout() {
         }`}
       >
         <div className="flex items-center gap-3 px-4 h-14 border-b border-sidebar-border">
-          <Building className="w-6 h-6 text-sidebar-primary shrink-0" />
+          <img src={ubLogo} alt="UB Logo" className="h-8 w-auto shrink-0" />
           {!collapsed && (
-            <span className="font-bold text-sm text-sidebar-accent-foreground tracking-wide">
-              IFRS 16 / Ind AS 116
+            <span className="font-bold text-xs text-sidebar-accent-foreground tracking-wide leading-tight">
+              Lease Management
             </span>
           )}
         </div>
