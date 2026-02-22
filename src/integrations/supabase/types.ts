@@ -297,6 +297,27 @@ export type Database = {
         }
         Relationships: []
       }
+      workflow_roles: {
+        Row: {
+          created_at: string
+          description: string
+          id: string
+          role_name: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string
+          id?: string
+          role_name: string
+        }
+        Update: {
+          created_at?: string
+          description?: string
+          id?: string
+          role_name?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
