@@ -161,7 +161,7 @@ export default function LeaseForm() {
                     <SelectItem key={lt} value={lt}>{lt}</SelectItem>
                   ))}
                   {leaseTypes.length === 0 && (
-                    <SelectItem value="" disabled>No types defined — add in Configuration</SelectItem>
+                    <SelectItem value="__none" disabled>No types defined — add in Configuration</SelectItem>
                   )}
                 </SelectContent>
               </Select>
@@ -179,7 +179,7 @@ export default function LeaseForm() {
                     <SelectItem key={al} value={al}>{al}</SelectItem>
                   ))}
                   {assetLocations.length === 0 && (
-                    <SelectItem value="" disabled>No locations defined — add in Configuration</SelectItem>
+                    <SelectItem value="__none" disabled>No locations defined — add in Configuration</SelectItem>
                   )}
                 </SelectContent>
               </Select>
