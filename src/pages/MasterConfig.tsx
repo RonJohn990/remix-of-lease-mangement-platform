@@ -143,7 +143,7 @@ export default function MasterConfig() {
   };
 
   const handleDeleteRole = async (id: string) => {
-    if (!confirm('Delete this workflow role?')) return;
+    if (!confirm('Delete this user role?')) return;
     try {
       const { error } = await supabase.from('workflow_roles').delete().eq('id', id);
       if (error) throw error;
@@ -206,14 +206,14 @@ export default function MasterConfig() {
     <div className="page-container animate-fade-in">
       <div className="mb-6">
         <h1 className="page-title">Configuration</h1>
-        <p className="text-sm text-muted-foreground">Define lease types, asset locations, and workflow roles</p>
+        <p className="text-sm text-muted-foreground">Define lease types, asset locations, and user roles</p>
       </div>
 
       <Tabs defaultValue="lease_types">
         <TabsList>
           <TabsTrigger value="lease_types">Lease Types</TabsTrigger>
           <TabsTrigger value="asset_locations">Asset Locations</TabsTrigger>
-          <TabsTrigger value="workflow_roles">Workflow Roles</TabsTrigger>
+          <TabsTrigger value="workflow_roles">User Roles</TabsTrigger>
         </TabsList>
         <TabsContent value="lease_types">
           {renderList('lease_type', leaseTypes, <Car className="w-4 h-4 text-primary" />)}
@@ -225,12 +225,12 @@ export default function MasterConfig() {
           <div className="space-y-2">
             <div className="flex justify-end mb-4">
               <Button size="sm" onClick={openAddRole}>
-                <Plus className="w-4 h-4 mr-1.5" /> Add Workflow Role
+                <Plus className="w-4 h-4 mr-1.5" /> Add User Role
               </Button>
             </div>
             {workflowRoles.length === 0 ? (
               <div className="bg-card border rounded-lg p-8 text-center">
-                <p className="text-sm text-muted-foreground">No workflow roles defined yet. Add one to get started.</p>
+                <p className="text-sm text-muted-foreground">No user roles defined yet. Add one to get started.</p>
               </div>
             ) : (
               <div className="space-y-2">
@@ -285,7 +285,7 @@ export default function MasterConfig() {
       <Dialog open={roleDialogOpen} onOpenChange={setRoleDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{editRole ? 'Edit' : 'Add'} Workflow Role</DialogTitle>
+            <DialogTitle>{editRole ? 'Edit' : 'Add'} User Role</DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
             <div>
