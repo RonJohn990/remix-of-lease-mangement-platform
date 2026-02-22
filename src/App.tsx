@@ -12,6 +12,7 @@ import LeaseForm from "./pages/LeaseForm";
 import LeaseDetail from "./pages/LeaseDetail";
 import Users from "./pages/Users";
 import Disclosures from "./pages/Disclosures";
+import Reports from "./pages/Reports";
 import MasterConfig from "./pages/MasterConfig";
 import Login from "./pages/Login";
 import NotFound from "./pages/NotFound";
@@ -49,6 +50,7 @@ const AppRoutes = () => {
         <Route path="/leases/:id" element={<LeaseDetail />} />
         <Route path="/leases/:id/edit" element={<LeaseForm />} />
         <Route path="/disclosures" element={<Disclosures />} />
+        <Route path="/reports" element={<Reports />} />
         <Route path="/master/users" element={<Users />} />
         <Route path="/master/groups" element={<Entities />} />
         <Route path="/master/entities" element={<Entities />} />

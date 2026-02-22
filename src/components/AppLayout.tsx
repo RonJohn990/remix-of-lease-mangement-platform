@@ -1,5 +1,5 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
-import { Building2, LayoutDashboard, FileText, Building, ChevronLeft, ChevronRight, Users, Database, LogOut, FileBarChart, Settings } from 'lucide-react';
+import { Building2, LayoutDashboard, FileText, Building, ChevronLeft, ChevronRight, Users, Database, LogOut, FileBarChart, Settings, FileSpreadsheet } from 'lucide-react';
 import { useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
@@ -8,6 +8,7 @@ const mainItems = [
   { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/leases', icon: FileText, label: 'Leases' },
   { to: '/disclosures', icon: FileBarChart, label: 'Disclosures' },
+  { to: '/reports', icon: FileSpreadsheet, label: 'Reports' },
 ];
 
 const masterDataItems = [
