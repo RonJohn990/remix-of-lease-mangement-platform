@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Users as UsersIcon, Plus, Trash2, Shield, Loader2 } from 'lucide-react';
+import { Users as UsersIcon, Plus, Trash2, Shield, Loader2, Edit2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { CorporateGroup, Entity } from '@/lib/types';
 import { getGroups, getEntities } from '@/lib/store';
@@ -47,6 +47,10 @@ export default function Users() {
   const [assignGroupId, setAssignGroupId] = useState('');
   const [assignEntityId, setAssignEntityId] = useState('');
 
+  // Role edit dialog
+  const [showRoleEdit, setShowRoleEdit] = useState(false);
+  const [roleEditUserId, setRoleEditUserId] = useState('');
+  const [roleEditValue, setRoleEditValue] = useState<string>('viewer');
   const reload = async () => {
     const [profilesRes, rolesRes, groupsData, entitiesData, assignRes] = await Promise.all([
       supabase.from('profiles').select('*'),
@@ -141,6 +145,28 @@ export default function Users() {
     }
   };
 
+  const openRoleEdit = (user: UserProfile) => {
+    setRoleEditUserId(user.user_id);
+    setRoleEditValue(user.roles[0] || 'viewer');
+    setShowRoleEdit(true);
+  };
+
+  const handleRoleChange = async () => {
+    setSaving(true);
+    try {
+      // Delete existing roles for user
+      await supabase.from('user_roles').delete().eq('user_id', roleEditUserId);
+      // Insert new role
+      const { error } = await supabase.from('user_roles').insert({ user_id: roleEditUserId, role: roleEditValue as any });
+      if (error) throw error;
+      setShowRoleEdit(false);
+      await reload();
+      toast.success('Role updated');
+    } catch (e: any) {
+      toast.error(e.message || 'Failed to update role');
+    } finally { setSaving(false); }
+  };
+
   const roleColor = (role: string) => {
     switch (role) {
       case 'admin': return 'destructive';
@@ -200,10 +226,13 @@ export default function Users() {
                   <td className="px-5 py-3 font-medium">{u.full_name || '—'}</td>
                   <td className="px-5 py-3 text-muted-foreground">{u.email}</td>
                   <td className="px-5 py-3">
-                    <div className="flex gap-1 flex-wrap">
+                    <div className="flex gap-1 flex-wrap items-center">
                       {u.roles.length ? u.roles.map(r => (
                         <Badge key={r} variant={roleColor(r) as any} className="text-xs">{r}</Badge>
                       )) : <span className="text-muted-foreground text-xs">No role</span>}
+                      <Button size="icon" variant="ghost" className="h-6 w-6 ml-1" onClick={() => openRoleEdit(u)}>
+                        <Edit2 className="w-3 h-3" />
+                      </Button>
                     </div>
                   </td>
                   <td className="px-5 py-3">
@@ -291,6 +320,30 @@ export default function Users() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowAssign(false)}>Cancel</Button>
             <Button onClick={handleAssign} disabled={saving}>{saving ? 'Assigning...' : 'Assign'}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Role Dialog */}
+      <Dialog open={showRoleEdit} onOpenChange={setShowRoleEdit}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Change System Role</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              User: {users.find(u => u.user_id === roleEditUserId)?.full_name || users.find(u => u.user_id === roleEditUserId)?.email}
+            </p>
+            <Select value={roleEditValue} onValueChange={setRoleEditValue}>
+              <SelectTrigger><SelectValue placeholder="Select role" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="admin">Admin</SelectItem>
+                <SelectItem value="lease_creator">Lease Creator</SelectItem>
+                <SelectItem value="viewer">Viewer</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowRoleEdit(false)}>Cancel</Button>
+            <Button onClick={handleRoleChange} disabled={saving}>{saving ? 'Saving...' : 'Update Role'}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
