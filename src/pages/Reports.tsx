@@ -11,7 +11,7 @@ import { Download, FileSpreadsheet, Loader2, Filter } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { parseISO, isAfter, isBefore, format } from 'date-fns';
 
-type ReportType = 'schedule' | 'journal' | 'summary';
+type ReportType = 'schedule' | 'journal' | 'summary' | 'version_history';
 
 export default function Reports() {
   const [leases, setLeases] = useState<Lease[]>([]);
@@ -51,6 +51,15 @@ export default function Reports() {
     return true;
   });
 
+  const getVersionInfo = (lease: Lease) => {
+    const modCount = (lease.modifications || []).length;
+    const currentVersion = lease.lease_version || 1;
+    const amendmentDates = (lease.modifications || [])
+      .sort((a, b) => a.effective_date.localeCompare(b.effective_date))
+      .map((m, i) => `v${i + 2}: ${m.effective_date} (${m.modification_type})`);
+    return { currentVersion, modCount, amendmentDates };
+  };
+
   const exportReport = () => {
     if (filteredLeases.length === 0) return;
 
@@ -63,17 +72,21 @@ export default function Reports() {
       lines.push('Lease Summary Report');
       lines.push(periodLabel);
       lines.push('');
-      lines.push('Lease Name,Entity,Lease Type,Classification,Status,Start Date,End Date,Monthly Amount,Discount Rate,Initial Liability,Initial ROU,Total Interest,Total Depreciation');
+      lines.push('Lease Name,Entity,Lease Type,Classification,Status,Current Version,No. of Amendments,Amendment Dates,Start Date,End Date,Monthly Amount,Discount Rate,Initial Liability,Initial ROU,Total Interest,Total Depreciation');
 
       for (const lease of filteredLeases) {
+        const vi = getVersionInfo(lease);
         try {
           const comp = computeLease(lease);
           lines.push([
-            lease.lease_name,
-            lease.legal_entity_name,
+            `"${lease.lease_name}"`,
+            `"${lease.legal_entity_name}"`,
             lease.lease_type,
             lease.lease_classification,
             lease.status,
+            vi.currentVersion,
+            vi.modCount,
+            `"${vi.amendmentDates.join('; ')}"`,
             lease.lease_start_date,
             lease.lease_end_date,
             lease.monthly_lease_amount,
@@ -84,14 +97,59 @@ export default function Reports() {
             comp.total_depreciation,
           ].join(','));
         } catch {
-          lines.push([lease.lease_name, lease.legal_entity_name, lease.lease_type, lease.lease_classification, lease.status, lease.lease_start_date, lease.lease_end_date, lease.monthly_lease_amount, lease.discount_rate_ibr, 'Error', '', '', ''].join(','));
+          lines.push([`"${lease.lease_name}"`, `"${lease.legal_entity_name}"`, lease.lease_type, lease.lease_classification, lease.status, vi.currentVersion, vi.modCount, `"${vi.amendmentDates.join('; ')}"`, lease.lease_start_date, lease.lease_end_date, lease.monthly_lease_amount, lease.discount_rate_ibr, 'Error', '', '', ''].join(','));
+        }
+      }
+    } else if (reportType === 'version_history') {
+      lines.push('Lease Version History Report');
+      lines.push(periodLabel);
+      lines.push('');
+      lines.push('Lease Name,Entity,Classification,Version,Event,Event Date,Type,Description,New End Date,New Monthly Amount,New Discount Rate,Termination Penalty,Scope Decrease %,Liability Adjustment,ROU Adjustment,Gain/Loss');
+
+      for (const lease of filteredLeases) {
+        // v1 - Initial
+        lines.push([
+          `"${lease.lease_name}"`,
+          `"${lease.legal_entity_name}"`,
+          lease.lease_classification,
+          1,
+          'INITIAL',
+          lease.rent_commencement_date,
+          'Initial Recognition',
+          '"Lease commencement"',
+          lease.lease_end_date,
+          lease.monthly_lease_amount,
+          lease.discount_rate_ibr,
+          '', '', '', '', '',
+        ].join(','));
+
+        // Subsequent versions
+        for (const [i, mod] of (lease.modifications || []).entries()) {
+          lines.push([
+            `"${lease.lease_name}"`,
+            `"${lease.legal_entity_name}"`,
+            lease.lease_classification,
+            i + 2,
+            mod.modification_type,
+            mod.effective_date,
+            mod.modification_type.replace(/_/g, ' '),
+            `"${mod.description || ''}"`,
+            mod.new_lease_end_date || '',
+            mod.new_monthly_amount || '',
+            mod.new_discount_rate || '',
+            mod.termination_penalty || '',
+            mod.scope_decrease_percentage || '',
+            mod.liability_adjustment || '',
+            mod.rou_adjustment || '',
+            mod.gain_loss || '',
+          ].join(','));
         }
       }
     } else if (reportType === 'schedule') {
       lines.push('Lease Schedule Report');
       lines.push(periodLabel);
       lines.push('');
-      lines.push('Lease Name,Entity,Classification,Period,Date,Days,Payment,Opening Liability,Interest,Closing Liability,Opening ROU,Depreciation,Closing ROU,Current Liability,Non-Current Liability');
+      lines.push('Lease Name,Entity,Classification,Version,Period,Date,Days,Payment,Opening Liability,Interest,Closing Liability,Opening ROU,Depreciation,Closing ROU,Current Liability,Non-Current Liability');
 
       for (const lease of filteredLeases) {
         try {
@@ -100,9 +158,10 @@ export default function Reports() {
             if (periodFrom && isBefore(parseISO(row.period_date), parseISO(periodFrom))) continue;
             if (periodTo && isAfter(parseISO(row.period_date), parseISO(periodTo))) continue;
             lines.push([
-              lease.lease_name,
-              lease.legal_entity_name,
+              `"${lease.lease_name}"`,
+              `"${lease.legal_entity_name}"`,
               lease.lease_classification,
+              lease.lease_version,
               row.period,
               row.period_date,
               row.days_in_period,
@@ -123,7 +182,7 @@ export default function Reports() {
       lines.push('Journal Entries Report');
       lines.push(periodLabel);
       lines.push('');
-      lines.push('Lease Name,Entity,Classification,Date,Description,Debit Account,Credit Account,Amount,Cash Flow Classification');
+      lines.push('Lease Name,Entity,Classification,Version,Date,Description,Debit Account,Credit Account,Amount,Cash Flow Classification');
 
       for (const lease of filteredLeases) {
         try {
@@ -133,9 +192,10 @@ export default function Reports() {
             if (periodFrom && isBefore(parseISO(entry.date), parseISO(periodFrom))) continue;
             if (periodTo && isAfter(parseISO(entry.date), parseISO(periodTo))) continue;
             lines.push([
-              lease.lease_name,
-              lease.legal_entity_name,
+              `"${lease.lease_name}"`,
+              `"${lease.legal_entity_name}"`,
               lease.lease_classification,
+              lease.lease_version,
               entry.date,
               `"${entry.description}"`,
               entry.debit_account,
@@ -153,7 +213,7 @@ export default function Reports() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    const typeLabel = reportType === 'summary' ? 'Summary' : reportType === 'schedule' ? 'Schedule' : 'JournalEntries';
+    const typeLabel = reportType === 'summary' ? 'Summary' : reportType === 'schedule' ? 'Schedule' : reportType === 'version_history' ? 'VersionHistory' : 'JournalEntries';
     a.download = `IndAS116_${typeLabel}_${format(new Date(), 'yyyyMMdd')}.csv`;
     a.click();
     URL.revokeObjectURL(url);
@@ -240,6 +300,7 @@ export default function Reports() {
               <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="summary">Lease Summary</SelectItem>
+                <SelectItem value="version_history">Version History</SelectItem>
                 <SelectItem value="schedule">Amortisation Schedule</SelectItem>
                 <SelectItem value="journal">Journal Entries</SelectItem>
               </SelectContent>
@@ -253,7 +314,7 @@ export default function Reports() {
         <div className="flex items-center justify-between px-4 py-3 border-b bg-muted/30">
           <div className="flex items-center gap-2">
             <h3 className="text-sm font-semibold">
-              {reportType === 'summary' ? 'Lease Summary' : reportType === 'schedule' ? 'Amortisation Schedule' : 'Journal Entries'}
+              {reportType === 'summary' ? 'Lease Summary' : reportType === 'schedule' ? 'Amortisation Schedule' : reportType === 'version_history' ? 'Version History' : 'Journal Entries'}
             </h3>
             <Badge variant="secondary" className="text-[10px]">{filteredLeases.length} leases</Badge>
           </div>
@@ -277,6 +338,8 @@ export default function Reports() {
                   <th className="px-3 py-2 text-left font-medium">Entity</th>
                   <th className="px-3 py-2 text-left font-medium">Type</th>
                   <th className="px-3 py-2 text-left font-medium">Classification</th>
+                  <th className="px-3 py-2 text-center font-medium">Version</th>
+                  <th className="px-3 py-2 text-center font-medium">Amendments</th>
                   <th className="px-3 py-2 text-left font-medium">Status</th>
                   <th className="px-3 py-2 text-right font-medium">Initial Liability</th>
                   <th className="px-3 py-2 text-right font-medium">Initial ROU</th>
@@ -284,7 +347,9 @@ export default function Reports() {
                 </tr>
               </thead>
               <tbody className="divide-y">
-                {previewData.map(({ lease, comp, error }) => (
+                {previewData.map(({ lease, comp, error }) => {
+                  const vi = getVersionInfo(lease);
+                  return (
                   <tr key={lease.lease_id} className="hover:bg-muted/10">
                     <td className="px-3 py-2 font-medium">{lease.lease_name}</td>
                     <td className="px-3 py-2 text-muted-foreground">{lease.legal_entity_name}</td>
@@ -293,6 +358,18 @@ export default function Reports() {
                       <Badge variant={lease.lease_classification === 'Finance' ? 'default' : 'secondary'} className="text-[10px]">
                         {lease.lease_classification}
                       </Badge>
+                    </td>
+                    <td className="px-3 py-2 text-center">
+                      <Badge variant="outline" className="text-[10px]">v{vi.currentVersion}</Badge>
+                    </td>
+                    <td className="px-3 py-2 text-center">
+                      {vi.modCount > 0 ? (
+                        <span className="text-xs" title={vi.amendmentDates.join('\n')}>
+                          {vi.modCount} amendment{vi.modCount > 1 ? 's' : ''}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">—</span>
+                      )}
                     </td>
                     <td className="px-3 py-2">
                       <Badge variant={lease.status === 'Active' ? 'default' : 'destructive'} className="text-[10px]">
@@ -309,12 +386,13 @@ export default function Reports() {
                       {error ? '—' : formatCurrency(comp!.total_interest)}
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
               {!previewData.some(d => d.error) && previewData.length > 1 && (
                 <tfoot>
                   <tr className="border-t font-semibold bg-muted/20">
-                    <td className="px-3 py-2" colSpan={5}>Total</td>
+                    <td className="px-3 py-2" colSpan={7}>Total</td>
                     <td className="px-3 py-2 text-right font-mono tabular-nums">
                       {formatCurrency(previewData.reduce((s, d) => s + (d.comp?.initial_liability || 0), 0))}
                     </td>
