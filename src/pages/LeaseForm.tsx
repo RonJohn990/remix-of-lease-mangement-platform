@@ -61,6 +61,20 @@ export default function LeaseForm() {
     load();
   }, [id]);
 
+  // Auto-calculate installments when dates or frequency change
+  useEffect(() => {
+    if (form.lease_start_date && form.lease_end_date && form.payment_frequency) {
+      const start = new Date(form.lease_start_date);
+      const end = new Date(form.lease_end_date);
+      if (end > start) {
+        const totalMonths = (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth());
+        const divisor = form.payment_frequency === 'Quarterly' ? 3 : form.payment_frequency === 'Annual' ? 12 : 1;
+        const installments = Math.ceil(totalMonths / divisor);
+        setForm(prev => ({ ...prev, number_installments: installments }));
+      }
+    }
+  }, [form.lease_start_date, form.lease_end_date, form.payment_frequency]);
+
   const update = (field: string, value: any) => setForm(prev => ({ ...prev, [field]: value }));
 
   const addEscalation = () => {
@@ -236,7 +250,7 @@ export default function LeaseForm() {
           <h3 className="text-sm font-semibold mb-3 text-primary">Financial Details</h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
-              <Label>Monthly Lease Amount *</Label>
+              <Label>Lease Amount ({form.payment_frequency || 'Monthly'}) *</Label>
               <Input type="number" value={form.monthly_lease_amount || ''} onChange={e => update('monthly_lease_amount', parseFloat(e.target.value) || 0)} />
             </div>
             <div>
@@ -245,7 +259,8 @@ export default function LeaseForm() {
             </div>
             <div>
               <Label>Number of Installments</Label>
-              <Input type="number" value={form.number_installments || ''} onChange={e => update('number_installments', parseInt(e.target.value) || 0)} />
+              <Input type="number" value={form.number_installments || ''} readOnly className="bg-muted cursor-not-allowed" />
+              <p className="text-xs text-muted-foreground mt-1">Auto-calculated from dates &amp; frequency</p>
             </div>
             <div>
               <Label>Security Deposit</Label>
