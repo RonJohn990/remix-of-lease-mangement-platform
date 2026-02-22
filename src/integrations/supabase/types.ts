@@ -14,7 +14,151 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      corporate_groups: {
+        Row: {
+          corporate_group_name: string
+          corporate_id: string
+          created_at: string
+        }
+        Insert: {
+          corporate_group_name: string
+          corporate_id?: string
+          created_at?: string
+        }
+        Update: {
+          corporate_group_name?: string
+          corporate_id?: string
+          created_at?: string
+        }
+        Relationships: []
+      }
+      entities: {
+        Row: {
+          corporate_id: string
+          created_at: string
+          entity_id: string
+          legal_entity_name: string
+        }
+        Insert: {
+          corporate_id: string
+          created_at?: string
+          entity_id?: string
+          legal_entity_name: string
+        }
+        Update: {
+          corporate_id?: string
+          created_at?: string
+          entity_id?: string
+          legal_entity_name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "entities_corporate_id_fkey"
+            columns: ["corporate_id"]
+            isOneToOne: false
+            referencedRelation: "corporate_groups"
+            referencedColumns: ["corporate_id"]
+          },
+        ]
+      }
+      leases: {
+        Row: {
+          asset_unit: string
+          concerned_person: string
+          created_at: string
+          discount_rate_ibr: number
+          entity_id: string
+          escalations: Json
+          initial_direct_cost: number
+          lease_comments: string
+          lease_end_date: string
+          lease_event: string
+          lease_id: string
+          lease_name: string
+          lease_start_date: string
+          lease_type: string
+          lease_version: number
+          legal_entity_name: string
+          low_value_flag: boolean
+          modifications: Json
+          monthly_lease_amount: number
+          number_installments: number
+          payment_frequency: string
+          rent_commencement_date: string
+          security_deposit: number
+          short_term_flag: boolean
+          status: string
+          tagged_employee: string
+          vendor_name: string
+        }
+        Insert: {
+          asset_unit?: string
+          concerned_person?: string
+          created_at?: string
+          discount_rate_ibr?: number
+          entity_id: string
+          escalations?: Json
+          initial_direct_cost?: number
+          lease_comments?: string
+          lease_end_date: string
+          lease_event?: string
+          lease_id?: string
+          lease_name: string
+          lease_start_date: string
+          lease_type?: string
+          lease_version?: number
+          legal_entity_name?: string
+          low_value_flag?: boolean
+          modifications?: Json
+          monthly_lease_amount?: number
+          number_installments?: number
+          payment_frequency?: string
+          rent_commencement_date: string
+          security_deposit?: number
+          short_term_flag?: boolean
+          status?: string
+          tagged_employee?: string
+          vendor_name?: string
+        }
+        Update: {
+          asset_unit?: string
+          concerned_person?: string
+          created_at?: string
+          discount_rate_ibr?: number
+          entity_id?: string
+          escalations?: Json
+          initial_direct_cost?: number
+          lease_comments?: string
+          lease_end_date?: string
+          lease_event?: string
+          lease_id?: string
+          lease_name?: string
+          lease_start_date?: string
+          lease_type?: string
+          lease_version?: number
+          legal_entity_name?: string
+          low_value_flag?: boolean
+          modifications?: Json
+          monthly_lease_amount?: number
+          number_installments?: number
+          payment_frequency?: string
+          rent_commencement_date?: string
+          security_deposit?: number
+          short_term_flag?: boolean
+          status?: string
+          tagged_employee?: string
+          vendor_name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "leases_entity_id_fkey"
+            columns: ["entity_id"]
+            isOneToOne: false
+            referencedRelation: "entities"
+            referencedColumns: ["entity_id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never

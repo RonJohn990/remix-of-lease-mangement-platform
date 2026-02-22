@@ -6,7 +6,7 @@ import { computeLease, generateJournalEntries, formatCurrency } from '@/lib/comp
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Download, Edit2, GitBranch, XCircle, AlertTriangle, Clock } from 'lucide-react';
+import { ArrowLeft, Download, Edit2, GitBranch, XCircle, AlertTriangle, Clock, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import ModificationDialog from '@/components/ModificationDialog';
 
@@ -29,12 +29,12 @@ export default function LeaseDetail() {
   const [journals, setJournals] = useState<JournalEntry[]>([]);
   const [error, setError] = useState('');
   const [modDialogOpen, setModDialogOpen] = useState(false);
+  const [loading, setLoading] = useState(true);
 
-  const loadLease = useCallback(() => {
+  const loadLease = useCallback(async () => {
     if (!id) return;
-    const l = getLease(id);
+    const l = await getLease(id);
     if (!l) { toast.error('Lease not found'); navigate('/leases'); return; }
-    // Ensure modifications array exists
     if (!l.modifications) l.modifications = [];
     setLease(l);
     try {
@@ -47,11 +47,17 @@ export default function LeaseDetail() {
     }
   }, [id, navigate]);
 
-  useEffect(() => { loadLease(); }, [loadLease]);
+  useEffect(() => { loadLease().finally(() => setLoading(false)); }, [loadLease]);
+
+  if (loading) return (
+    <div className="page-container flex items-center justify-center min-h-[50vh]">
+      <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+    </div>
+  );
 
   if (!lease) return null;
 
-  const handleModification = (mod: LeaseModification) => {
+  const handleModification = async (mod: LeaseModification) => {
     const updatedLease: Lease = {
       ...lease,
       modifications: [...(lease.modifications || []), mod],
@@ -69,28 +75,26 @@ export default function LeaseDetail() {
       if (mod.new_discount_rate > 0) updatedLease.discount_rate_ibr = mod.new_discount_rate;
     }
 
-    // Save and recompute
-    saveLease(updatedLease);
+    await saveLease(updatedLease);
     setModDialogOpen(false);
-    loadLease();
+    await loadLease();
     toast.success(mod.modification_type === 'EARLY_TERMINATION' ? 'Lease terminated' : 'Modification applied');
   };
 
-  const handleDeleteModification = (modId: string) => {
+  const handleDeleteModification = async (modId: string) => {
     if (!confirm('Remove this modification? The lease will be recomputed.')) return;
     const updatedLease: Lease = {
       ...lease,
       modifications: lease.modifications.filter(m => m.modification_id !== modId),
       lease_version: Math.max(1, lease.lease_version - 1),
     };
-    // Restore status if we removed a termination
     const hadTermination = lease.modifications.some(m => m.modification_id === modId && m.modification_type === 'EARLY_TERMINATION');
     if (hadTermination) {
       updatedLease.status = 'Active';
       updatedLease.lease_event = updatedLease.modifications.length > 0 ? 'MODIFICATION' : 'INITIAL';
     }
-    saveLease(updatedLease);
-    loadLease();
+    await saveLease(updatedLease);
+    await loadLease();
     toast.success('Modification removed');
   };
 
@@ -146,7 +150,6 @@ export default function LeaseDetail() {
         </div>
       </div>
 
-      {/* Summary cards */}
       {computation && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
           <div className="stat-card">
@@ -168,7 +171,6 @@ export default function LeaseDetail() {
         </div>
       )}
 
-      {/* Modification History */}
       {modifications.length > 0 && (
         <div className="bg-card border rounded-lg p-5 mb-6">
           <h3 className="text-sm font-semibold text-primary mb-3 flex items-center gap-2">
@@ -224,7 +226,6 @@ export default function LeaseDetail() {
         </div>
       )}
 
-      {/* Lease details */}
       <div className="bg-card border rounded-lg p-5 mb-6">
         <h3 className="text-sm font-semibold text-primary mb-3">Lease Details</h3>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-y-3 gap-x-6 text-sm">
@@ -344,7 +345,6 @@ export default function LeaseDetail() {
         </Tabs>
       )}
 
-      {/* Modification Dialog */}
       <ModificationDialog
         open={modDialogOpen}
         onClose={() => setModDialogOpen(false)}

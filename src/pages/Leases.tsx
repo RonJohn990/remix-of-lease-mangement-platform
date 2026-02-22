@@ -1,21 +1,26 @@
 import { useEffect, useState } from 'react';
 import { Lease } from '@/lib/types';
-import { getLeases, deleteLease, getEntities, getGroups } from '@/lib/store';
+import { getLeases, deleteLease } from '@/lib/store';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Search, Trash2, Eye, Edit2, FileText } from 'lucide-react';
+import { Plus, Search, Trash2, Eye, Edit2, FileText, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatCurrency } from '@/lib/computations';
 
 export default function Leases() {
   const [leases, setLeases] = useState<Lease[]>([]);
   const [search, setSearch] = useState('');
+  const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
-  const reload = () => setLeases(getLeases());
-  useEffect(() => { reload(); }, []);
+  const reload = async () => {
+    const data = await getLeases();
+    setLeases(data);
+  };
+
+  useEffect(() => { reload().finally(() => setLoading(false)); }, []);
 
   const filtered = leases.filter(l =>
     l.lease_name.toLowerCase().includes(search.toLowerCase()) ||
@@ -23,13 +28,21 @@ export default function Leases() {
     l.legal_entity_name.toLowerCase().includes(search.toLowerCase())
   );
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (confirm('Delete this lease and all its data?')) {
-      deleteLease(id);
-      reload();
-      toast.success('Lease deleted');
+      try {
+        await deleteLease(id);
+        await reload();
+        toast.success('Lease deleted');
+      } catch (e: any) { toast.error(e.message); }
     }
   };
+
+  if (loading) return (
+    <div className="page-container flex items-center justify-center min-h-[50vh]">
+      <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+    </div>
+  );
 
   return (
     <div className="page-container animate-fade-in">

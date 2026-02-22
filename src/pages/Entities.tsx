@@ -5,12 +5,13 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Building2, Building, Plus, Trash2, Edit2 } from 'lucide-react';
+import { Building2, Building, Plus, Trash2, Edit2, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function Entities() {
   const [groups, setGroups] = useState<CorporateGroup[]>([]);
   const [entities, setEntities] = useState<Entity[]>([]);
+  const [loading, setLoading] = useState(true);
   const [groupDialog, setGroupDialog] = useState(false);
   const [entityDialog, setEntityDialog] = useState(false);
   const [editGroup, setEditGroup] = useState<CorporateGroup | null>(null);
@@ -18,57 +19,73 @@ export default function Entities() {
   const [groupName, setGroupName] = useState('');
   const [entityName, setEntityName] = useState('');
   const [selectedGroupId, setSelectedGroupId] = useState('');
+  const [saving, setSaving] = useState(false);
 
-  const reload = () => {
-    setGroups(getGroups());
-    setEntities(getEntities());
+  const reload = async () => {
+    const [g, e] = await Promise.all([getGroups(), getEntities()]);
+    setGroups(g);
+    setEntities(e);
   };
 
-  useEffect(() => { reload(); }, []);
+  useEffect(() => { reload().finally(() => setLoading(false)); }, []);
 
-  const handleSaveGroup = () => {
+  const handleSaveGroup = async () => {
     if (!groupName.trim()) { toast.error('Group name is required'); return; }
-    saveGroup({
-      corporate_id: editGroup?.corporate_id || generateId(),
-      corporate_group_name: groupName.trim(),
-      created_at: editGroup?.created_at || new Date().toISOString(),
-    });
-    setGroupDialog(false);
-    setEditGroup(null);
-    setGroupName('');
-    reload();
-    toast.success('Corporate group saved');
+    setSaving(true);
+    try {
+      await saveGroup({
+        corporate_id: editGroup?.corporate_id || generateId(),
+        corporate_group_name: groupName.trim(),
+        created_at: editGroup?.created_at || new Date().toISOString(),
+      });
+      setGroupDialog(false);
+      setEditGroup(null);
+      setGroupName('');
+      await reload();
+      toast.success('Corporate group saved');
+    } catch (e: any) {
+      toast.error(e.message || 'Failed to save');
+    } finally { setSaving(false); }
   };
 
-  const handleSaveEntity = () => {
+  const handleSaveEntity = async () => {
     if (!entityName.trim() || !selectedGroupId) { toast.error('All fields are required'); return; }
-    saveEntity({
-      entity_id: editEntity?.entity_id || generateId(),
-      corporate_id: selectedGroupId,
-      legal_entity_name: entityName.trim(),
-      created_at: editEntity?.created_at || new Date().toISOString(),
-    });
-    setEntityDialog(false);
-    setEditEntity(null);
-    setEntityName('');
-    setSelectedGroupId('');
-    reload();
-    toast.success('Entity saved');
+    setSaving(true);
+    try {
+      await saveEntity({
+        entity_id: editEntity?.entity_id || generateId(),
+        corporate_id: selectedGroupId,
+        legal_entity_name: entityName.trim(),
+        created_at: editEntity?.created_at || new Date().toISOString(),
+      });
+      setEntityDialog(false);
+      setEditEntity(null);
+      setEntityName('');
+      setSelectedGroupId('');
+      await reload();
+      toast.success('Entity saved');
+    } catch (e: any) {
+      toast.error(e.message || 'Failed to save');
+    } finally { setSaving(false); }
   };
 
-  const handleDeleteGroup = (id: string) => {
+  const handleDeleteGroup = async (id: string) => {
     if (confirm('Delete this group and all its entities/leases?')) {
-      deleteGroup(id);
-      reload();
-      toast.success('Group deleted');
+      try {
+        await deleteGroup(id);
+        await reload();
+        toast.success('Group deleted');
+      } catch (e: any) { toast.error(e.message); }
     }
   };
 
-  const handleDeleteEntity = (id: string) => {
+  const handleDeleteEntity = async (id: string) => {
     if (confirm('Delete this entity and all its leases?')) {
-      deleteEntity(id);
-      reload();
-      toast.success('Entity deleted');
+      try {
+        await deleteEntity(id);
+        await reload();
+        toast.success('Entity deleted');
+      } catch (e: any) { toast.error(e.message); }
     }
   };
 
@@ -84,6 +101,12 @@ export default function Entities() {
     setSelectedGroupId(e.corporate_id);
     setEntityDialog(true);
   };
+
+  if (loading) return (
+    <div className="page-container flex items-center justify-center min-h-[50vh]">
+      <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+    </div>
+  );
 
   return (
     <div className="page-container animate-fade-in">
@@ -102,7 +125,6 @@ export default function Entities() {
         </div>
       </div>
 
-      {/* Groups with nested entities */}
       {groups.length === 0 ? (
         <div className="bg-card border rounded-lg p-8 text-center">
           <Building className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
@@ -158,7 +180,6 @@ export default function Entities() {
         </div>
       )}
 
-      {/* Group Dialog */}
       <Dialog open={groupDialog} onOpenChange={setGroupDialog}>
         <DialogContent>
           <DialogHeader>
@@ -167,12 +188,11 @@ export default function Entities() {
           <Input placeholder="Group name" value={groupName} onChange={e => setGroupName(e.target.value)} />
           <DialogFooter>
             <Button variant="outline" onClick={() => setGroupDialog(false)}>Cancel</Button>
-            <Button onClick={handleSaveGroup}>Save</Button>
+            <Button onClick={handleSaveGroup} disabled={saving}>{saving ? 'Saving...' : 'Save'}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Entity Dialog */}
       <Dialog open={entityDialog} onOpenChange={setEntityDialog}>
         <DialogContent>
           <DialogHeader>
@@ -191,7 +211,7 @@ export default function Entities() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setEntityDialog(false)}>Cancel</Button>
-            <Button onClick={handleSaveEntity}>Save</Button>
+            <Button onClick={handleSaveEntity} disabled={saving}>{saving ? 'Saving...' : 'Save'}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

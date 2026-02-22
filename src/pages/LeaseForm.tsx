@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
-import { Plus, Trash2, ArrowLeft, Save } from 'lucide-react';
+import { Plus, Trash2, ArrowLeft, Save, Loader2 } from 'lucide-react';
 
 const defaultLease: Partial<Lease> = {
   lease_version: 1,
@@ -34,14 +34,21 @@ export default function LeaseForm() {
   const isEdit = id && id !== 'new';
   const [entities, setEntities] = useState<Entity[]>([]);
   const [form, setForm] = useState<Partial<Lease>>(defaultLease);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    setEntities(getEntities());
-    if (isEdit) {
-      const lease = getLease(id!);
-      if (lease) setForm(lease);
-      else { toast.error('Lease not found'); navigate('/leases'); }
-    }
+    const load = async () => {
+      const ents = await getEntities();
+      setEntities(ents);
+      if (isEdit) {
+        const lease = await getLease(id!);
+        if (lease) setForm(lease);
+        else { toast.error('Lease not found'); navigate('/leases'); }
+      }
+      setLoading(false);
+    };
+    load();
   }, [id]);
 
   const update = (field: string, value: any) => setForm(prev => ({ ...prev, [field]: value }));
@@ -61,7 +68,7 @@ export default function LeaseForm() {
     update('escalations', (form.escalations || []).filter((_, i) => i !== idx));
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!form.entity_id) { toast.error('Select an entity'); return; }
     if (!form.lease_name?.trim()) { toast.error('Lease name is required'); return; }
     if (!form.lease_start_date || !form.lease_end_date || !form.rent_commencement_date) {
@@ -74,19 +81,30 @@ export default function LeaseForm() {
       toast.error('Monthly lease amount must be > 0'); return;
     }
 
-    const entity = entities.find(e => e.entity_id === form.entity_id);
-    const lease: Lease = {
-      ...defaultLease,
-      ...form,
-      lease_id: form.lease_id || generateId(),
-      legal_entity_name: entity?.legal_entity_name || '',
-      created_at: form.created_at || new Date().toISOString(),
-    } as Lease;
+    setSaving(true);
+    try {
+      const entity = entities.find(e => e.entity_id === form.entity_id);
+      const lease: Lease = {
+        ...defaultLease,
+        ...form,
+        lease_id: form.lease_id || generateId(),
+        legal_entity_name: entity?.legal_entity_name || '',
+        created_at: form.created_at || new Date().toISOString(),
+      } as Lease;
 
-    saveLease(lease);
-    toast.success('Lease saved');
-    navigate(`/leases/${lease.lease_id}`);
+      await saveLease(lease);
+      toast.success('Lease saved');
+      navigate(`/leases/${lease.lease_id}`);
+    } catch (e: any) {
+      toast.error(e.message || 'Failed to save');
+    } finally { setSaving(false); }
   };
+
+  if (loading) return (
+    <div className="page-container flex items-center justify-center min-h-[50vh]">
+      <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+    </div>
+  );
 
   return (
     <div className="page-container animate-fade-in max-w-4xl">
@@ -249,8 +267,9 @@ export default function LeaseForm() {
         {/* Actions */}
         <div className="flex justify-end gap-3 pt-2 border-t">
           <Button variant="outline" onClick={() => navigate('/leases')}>Cancel</Button>
-          <Button onClick={handleSave}>
-            <Save className="w-4 h-4 mr-1.5" /> Save Lease
+          <Button onClick={handleSave} disabled={saving}>
+            {saving ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> : <Save className="w-4 h-4 mr-1.5" />}
+            {saving ? 'Saving...' : 'Save Lease'}
           </Button>
         </div>
       </div>
