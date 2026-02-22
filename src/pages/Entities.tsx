@@ -1,15 +1,32 @@
 import { useEffect, useState } from 'react';
 import { CorporateGroup, Entity } from '@/lib/types';
 import { getGroups, getEntities, saveGroup, saveEntity, deleteGroup, deleteEntity, generateId } from '@/lib/store';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Building2, Building, Plus, Trash2, Edit2, Loader2, MapPin } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Building2, Building, Plus, Trash2, Edit2, Loader2, MapPin, UserPlus } from 'lucide-react';
 import { toast } from 'sonner';
 import { useLocation } from 'react-router-dom';
 
+interface UserProfile {
+  user_id: string;
+  full_name: string;
+  email: string;
+}
+
+interface Assignment {
+  id: string;
+  user_id: string;
+  entity_id: string | null;
+  corporate_id: string;
+}
+
 export default function Entities() {
+  const { isAdmin } = useAuth();
   const location = useLocation();
   const isGroupsView = location.pathname === '/master/groups';
 
@@ -32,10 +49,26 @@ export default function Entities() {
   const [entityFYEnd, setEntityFYEnd] = useState('03-31');
   const [saving, setSaving] = useState(false);
 
+  // User assignment state (admin only)
+  const [users, setUsers] = useState<UserProfile[]>([]);
+  const [assignments, setAssignments] = useState<Assignment[]>([]);
+  const [assignDialog, setAssignDialog] = useState(false);
+  const [assignEntityId, setAssignEntityId] = useState('');
+  const [assignEntityName, setAssignEntityName] = useState('');
+  const [assignUserId, setAssignUserId] = useState('');
+
   const reload = async () => {
     const [g, e] = await Promise.all([getGroups(), getEntities()]);
     setGroups(g);
     setEntities(e);
+    if (isAdmin) {
+      const [profilesRes, assignRes] = await Promise.all([
+        supabase.from('profiles').select('user_id, full_name, email'),
+        supabase.from('user_entity_assignments').select('*'),
+      ]);
+      setUsers((profilesRes.data || []).map((p: any) => ({ user_id: p.user_id, full_name: p.full_name, email: p.email })));
+      setAssignments((assignRes.data || []).map((a: any) => ({ id: a.id, user_id: a.user_id, entity_id: a.entity_id, corporate_id: a.corporate_id })));
+    }
   };
 
   useEffect(() => { reload().finally(() => setLoading(false)); }, []);
@@ -132,6 +165,43 @@ export default function Entities() {
     setEntityDialog(true);
   };
 
+  const openAssignUsers = (entity: Entity) => {
+    setAssignEntityId(entity.entity_id);
+    setAssignEntityName(entity.legal_entity_name);
+    setAssignUserId('');
+    setAssignDialog(true);
+  };
+
+  const handleAssignUser = async () => {
+    if (!assignUserId) { toast.error('Select a user'); return; }
+    const entity = entities.find(e => e.entity_id === assignEntityId);
+    if (!entity) return;
+    setSaving(true);
+    try {
+      const { error } = await supabase.from('user_entity_assignments').insert({
+        user_id: assignUserId,
+        corporate_id: entity.corporate_id,
+        entity_id: assignEntityId,
+      });
+      if (error) throw error;
+      await reload();
+      toast.success('User assigned to entity');
+    } catch (e: any) {
+      toast.error(e.message || 'Failed to assign');
+    } finally { setSaving(false); }
+  };
+
+  const handleRemoveEntityAssignment = async (assignmentId: string) => {
+    try {
+      await supabase.from('user_entity_assignments').delete().eq('id', assignmentId);
+      await reload();
+      toast.success('Assignment removed');
+    } catch (e: any) { toast.error(e.message); }
+  };
+
+  const getEntityAssignments = (entityId: string) => 
+    assignments.filter(a => a.entity_id === entityId);
+
   if (loading) return (
     <div className="page-container flex items-center justify-center min-h-[50vh]">
       <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
@@ -211,6 +281,7 @@ export default function Entities() {
                   <th className="text-left px-5 py-3 font-medium text-muted-foreground">Group</th>
                   <th className="text-left px-5 py-3 font-medium text-muted-foreground">Location</th>
                   <th className="text-left px-5 py-3 font-medium text-muted-foreground">Financial Year</th>
+                  {isAdmin && <th className="text-left px-5 py-3 font-medium text-muted-foreground">Assigned Users</th>}
                   <th className="text-right px-5 py-3 font-medium text-muted-foreground">Actions</th>
                 </tr>
               </thead>
@@ -236,6 +307,26 @@ export default function Entities() {
                       <td className="px-5 py-3 text-muted-foreground">
                         {entity.financial_year_start} to {entity.financial_year_end}
                       </td>
+                      {isAdmin && (
+                        <td className="px-5 py-3">
+                          <div className="flex gap-1 flex-wrap items-center">
+                            {getEntityAssignments(entity.entity_id).map(a => {
+                              const user = users.find(u => u.user_id === a.user_id);
+                              return (
+                                <Badge key={a.id} variant="outline" className="text-xs gap-1">
+                                  {user?.full_name || user?.email || 'Unknown'}
+                                  <button onClick={() => handleRemoveEntityAssignment(a.id)} className="ml-0.5 hover:text-destructive">
+                                    <Trash2 className="w-2.5 h-2.5" />
+                                  </button>
+                                </Badge>
+                              );
+                            })}
+                            <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => openAssignUsers(entity)}>
+                              <UserPlus className="w-3.5 h-3.5 text-primary" />
+                            </Button>
+                          </div>
+                        </td>
+                      )}
                       <td className="px-5 py-3 text-right">
                         <div className="flex gap-1 justify-end">
                           <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEditEntity(entity)}>
@@ -304,6 +395,31 @@ export default function Entities() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setEntityDialog(false)}>Cancel</Button>
             <Button onClick={handleSaveEntity} disabled={saving}>{saving ? 'Saving...' : 'Save'}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Assign User to Entity Dialog */}
+      <Dialog open={assignDialog} onOpenChange={setAssignDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Assign User to {assignEntityName}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <Select value={assignUserId} onValueChange={setAssignUserId}>
+              <SelectTrigger><SelectValue placeholder="Select user" /></SelectTrigger>
+              <SelectContent>
+                {users
+                  .filter(u => !getEntityAssignments(assignEntityId).some(a => a.user_id === u.user_id))
+                  .map(u => (
+                    <SelectItem key={u.user_id} value={u.user_id}>{u.full_name || u.email}</SelectItem>
+                  ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAssignDialog(false)}>Cancel</Button>
+            <Button onClick={handleAssignUser} disabled={saving}>{saving ? 'Assigning...' : 'Assign'}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

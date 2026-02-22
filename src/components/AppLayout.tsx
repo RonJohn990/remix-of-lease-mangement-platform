@@ -1,5 +1,5 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
-import { Building2, LayoutDashboard, FileText, Building, ChevronLeft, ChevronRight, Users, Database, LogOut, FileBarChart } from 'lucide-react';
+import { Building2, LayoutDashboard, FileText, Building, ChevronLeft, ChevronRight, Users, Database, LogOut, FileBarChart, Settings } from 'lucide-react';
 import { useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
@@ -14,6 +14,7 @@ const masterDataItems = [
   { to: '/master/users', icon: Users, label: 'Users', adminOnly: true },
   { to: '/master/groups', icon: Building, label: 'Corporate Groups' },
   { to: '/master/entities', icon: Building2, label: 'Entities' },
+  { to: '/master/config', icon: Settings, label: 'Configuration', adminOnly: true },
 ];
 
 export default function AppLayout() {

@@ -12,6 +12,7 @@ import LeaseForm from "./pages/LeaseForm";
 import LeaseDetail from "./pages/LeaseDetail";
 import Users from "./pages/Users";
 import Disclosures from "./pages/Disclosures";
+import MasterConfig from "./pages/MasterConfig";
 import Login from "./pages/Login";
 import NotFound from "./pages/NotFound";
 import { Loader2 } from "lucide-react";
@@ -51,6 +52,7 @@ const AppRoutes = () => {
         <Route path="/master/users" element={<Users />} />
         <Route path="/master/groups" element={<Entities />} />
         <Route path="/master/entities" element={<Entities />} />
+        <Route path="/master/config" element={<MasterConfig />} />
       </Route>
       <Route path="*" element={<NotFound />} />
     </Routes>
