@@ -39,7 +39,7 @@ export default function AppLayout() {
         }`}
       >
         <div className="flex items-center gap-3 px-4 h-14 border-b border-sidebar-border">
-          <img src={ubLogo} alt="UB Logo" className="h-8 w-auto shrink-0" />
+          <img src={ubLogo} alt="UB Logo" className="h-8 w-auto shrink-0 brightness-0 invert" />
           {!collapsed && (
             <span className="font-bold text-xs text-sidebar-accent-foreground tracking-wide leading-tight">
               Lease Management
