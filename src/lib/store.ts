@@ -1,94 +1,191 @@
-import { CorporateGroup, Entity, Lease, DashboardStats, LeaseModification } from './types';
+import { CorporateGroup, Entity, Lease, DashboardStats } from './types';
 import { computeLease } from './computations';
-
-const STORAGE_KEYS = {
-  GROUPS: 'lease_app_groups',
-  ENTITIES: 'lease_app_entities',
-  LEASES: 'lease_app_leases',
-};
-
-function getItem<T>(key: string): T[] {
-  const data = localStorage.getItem(key);
-  return data ? JSON.parse(data) : [];
-}
-
-function setItem<T>(key: string, data: T[]): void {
-  localStorage.setItem(key, JSON.stringify(data));
-}
+import { supabase } from '@/integrations/supabase/client';
 
 // Corporate Groups
-export function getGroups(): CorporateGroup[] {
-  return getItem<CorporateGroup>(STORAGE_KEYS.GROUPS);
+export async function getGroups(): Promise<CorporateGroup[]> {
+  const { data, error } = await supabase
+    .from('corporate_groups')
+    .select('*')
+    .order('created_at', { ascending: true });
+  if (error) throw error;
+  return (data || []).map(row => ({
+    corporate_id: row.corporate_id,
+    corporate_group_name: row.corporate_group_name,
+    created_at: row.created_at,
+  }));
 }
 
-export function saveGroup(group: CorporateGroup): void {
-  const groups = getGroups();
-  const idx = groups.findIndex(g => g.corporate_id === group.corporate_id);
-  if (idx >= 0) groups[idx] = group;
-  else groups.push(group);
-  setItem(STORAGE_KEYS.GROUPS, groups);
+export async function saveGroup(group: CorporateGroup): Promise<void> {
+  const { error } = await supabase
+    .from('corporate_groups')
+    .upsert({
+      corporate_id: group.corporate_id,
+      corporate_group_name: group.corporate_group_name,
+    }, { onConflict: 'corporate_id' });
+  if (error) throw error;
 }
 
-export function deleteGroup(id: string): void {
-  setItem(STORAGE_KEYS.GROUPS, getGroups().filter(g => g.corporate_id !== id));
-  // Also delete child entities and their leases
-  const entities = getEntities().filter(e => e.corporate_id === id);
-  entities.forEach(e => deleteEntity(e.entity_id));
+export async function deleteGroup(id: string): Promise<void> {
+  // CASCADE will handle entities and leases
+  const { error } = await supabase.from('corporate_groups').delete().eq('corporate_id', id);
+  if (error) throw error;
 }
 
 // Entities
-export function getEntities(): Entity[] {
-  return getItem<Entity>(STORAGE_KEYS.ENTITIES);
+export async function getEntities(): Promise<Entity[]> {
+  const { data, error } = await supabase
+    .from('entities')
+    .select('*')
+    .order('created_at', { ascending: true });
+  if (error) throw error;
+  return (data || []).map(row => ({
+    entity_id: row.entity_id,
+    corporate_id: row.corporate_id,
+    legal_entity_name: row.legal_entity_name,
+    created_at: row.created_at,
+  }));
 }
 
-export function getEntitiesByGroup(corporateId: string): Entity[] {
-  return getEntities().filter(e => e.corporate_id === corporateId);
+export async function getEntitiesByGroup(corporateId: string): Promise<Entity[]> {
+  const { data, error } = await supabase
+    .from('entities')
+    .select('*')
+    .eq('corporate_id', corporateId)
+    .order('created_at', { ascending: true });
+  if (error) throw error;
+  return (data || []).map(row => ({
+    entity_id: row.entity_id,
+    corporate_id: row.corporate_id,
+    legal_entity_name: row.legal_entity_name,
+    created_at: row.created_at,
+  }));
 }
 
-export function saveEntity(entity: Entity): void {
-  const entities = getEntities();
-  const idx = entities.findIndex(e => e.entity_id === entity.entity_id);
-  if (idx >= 0) entities[idx] = entity;
-  else entities.push(entity);
-  setItem(STORAGE_KEYS.ENTITIES, entities);
+export async function saveEntity(entity: Entity): Promise<void> {
+  const { error } = await supabase
+    .from('entities')
+    .upsert({
+      entity_id: entity.entity_id,
+      corporate_id: entity.corporate_id,
+      legal_entity_name: entity.legal_entity_name,
+    }, { onConflict: 'entity_id' });
+  if (error) throw error;
 }
 
-export function deleteEntity(id: string): void {
-  setItem(STORAGE_KEYS.ENTITIES, getEntities().filter(e => e.entity_id !== id));
-  // Also delete child leases
-  setItem(STORAGE_KEYS.LEASES, getLeases().filter(l => l.entity_id !== id));
+export async function deleteEntity(id: string): Promise<void> {
+  const { error } = await supabase.from('entities').delete().eq('entity_id', id);
+  if (error) throw error;
 }
 
 // Leases
-export function getLeases(): Lease[] {
-  return getItem<Lease>(STORAGE_KEYS.LEASES);
+export async function getLeases(): Promise<Lease[]> {
+  const { data, error } = await supabase
+    .from('leases')
+    .select('*')
+    .order('created_at', { ascending: true });
+  if (error) throw error;
+  return (data || []).map(mapRowToLease);
 }
 
-export function getLeasesByEntity(entityId: string): Lease[] {
-  return getLeases().filter(l => l.entity_id === entityId);
+export async function getLeasesByEntity(entityId: string): Promise<Lease[]> {
+  const { data, error } = await supabase
+    .from('leases')
+    .select('*')
+    .eq('entity_id', entityId)
+    .order('created_at', { ascending: true });
+  if (error) throw error;
+  return (data || []).map(mapRowToLease);
 }
 
-export function getLease(leaseId: string): Lease | undefined {
-  return getLeases().find(l => l.lease_id === leaseId);
+export async function getLease(leaseId: string): Promise<Lease | undefined> {
+  const { data, error } = await supabase
+    .from('leases')
+    .select('*')
+    .eq('lease_id', leaseId)
+    .maybeSingle();
+  if (error) throw error;
+  return data ? mapRowToLease(data) : undefined;
 }
 
-export function saveLease(lease: Lease): void {
-  const leases = getLeases();
-  const idx = leases.findIndex(l => l.lease_id === lease.lease_id);
-  if (idx >= 0) leases[idx] = lease;
-  else leases.push(lease);
-  setItem(STORAGE_KEYS.LEASES, leases);
+export async function saveLease(lease: Lease): Promise<void> {
+  const { error } = await supabase
+    .from('leases')
+    .upsert({
+      lease_id: lease.lease_id,
+      entity_id: lease.entity_id,
+      legal_entity_name: lease.legal_entity_name,
+      lease_version: lease.lease_version,
+      lease_event: lease.lease_event,
+      lease_name: lease.lease_name,
+      vendor_name: lease.vendor_name,
+      tagged_employee: lease.tagged_employee,
+      asset_unit: lease.asset_unit,
+      concerned_person: lease.concerned_person,
+      lease_comments: lease.lease_comments,
+      payment_frequency: lease.payment_frequency,
+      lease_type: lease.lease_type,
+      lease_start_date: lease.lease_start_date,
+      lease_end_date: lease.lease_end_date,
+      rent_commencement_date: lease.rent_commencement_date,
+      discount_rate_ibr: lease.discount_rate_ibr,
+      monthly_lease_amount: lease.monthly_lease_amount,
+      number_installments: lease.number_installments,
+      security_deposit: lease.security_deposit,
+      initial_direct_cost: lease.initial_direct_cost,
+      short_term_flag: lease.short_term_flag,
+      low_value_flag: lease.low_value_flag,
+      status: lease.status,
+      escalations: JSON.parse(JSON.stringify(lease.escalations || [])),
+      modifications: JSON.parse(JSON.stringify(lease.modifications || [])),
+    }, { onConflict: 'lease_id' });
+  if (error) throw error;
 }
 
-export function deleteLease(id: string): void {
-  setItem(STORAGE_KEYS.LEASES, getLeases().filter(l => l.lease_id !== id));
+export async function deleteLease(id: string): Promise<void> {
+  const { error } = await supabase.from('leases').delete().eq('lease_id', id);
+  if (error) throw error;
+}
+
+function mapRowToLease(row: any): Lease {
+  return {
+    lease_id: row.lease_id,
+    entity_id: row.entity_id,
+    legal_entity_name: row.legal_entity_name || '',
+    lease_version: row.lease_version || 1,
+    lease_event: row.lease_event || 'INITIAL',
+    lease_name: row.lease_name,
+    vendor_name: row.vendor_name || '',
+    tagged_employee: row.tagged_employee || '',
+    asset_unit: row.asset_unit || '',
+    concerned_person: row.concerned_person || '',
+    lease_comments: row.lease_comments || '',
+    payment_frequency: row.payment_frequency || 'Monthly',
+    lease_type: row.lease_type || '',
+    lease_start_date: row.lease_start_date,
+    lease_end_date: row.lease_end_date,
+    rent_commencement_date: row.rent_commencement_date,
+    discount_rate_ibr: Number(row.discount_rate_ibr) || 0,
+    monthly_lease_amount: Number(row.monthly_lease_amount) || 0,
+    number_installments: row.number_installments || 0,
+    security_deposit: Number(row.security_deposit) || 0,
+    initial_direct_cost: Number(row.initial_direct_cost) || 0,
+    short_term_flag: row.short_term_flag || false,
+    low_value_flag: row.low_value_flag || false,
+    status: row.status || 'Active',
+    created_at: row.created_at,
+    escalations: Array.isArray(row.escalations) ? row.escalations : [],
+    modifications: Array.isArray(row.modifications) ? row.modifications : [],
+  };
 }
 
 // Dashboard
-export function getDashboardStats(): DashboardStats {
-  const groups = getGroups();
-  const entities = getEntities();
-  const leases = getLeases();
+export async function getDashboardStats(): Promise<DashboardStats> {
+  const [groups, entities, leases] = await Promise.all([
+    getGroups(),
+    getEntities(),
+    getLeases(),
+  ]);
   const activeLeases = leases.filter(l => l.status === 'Active');
 
   let totalLiability = 0;

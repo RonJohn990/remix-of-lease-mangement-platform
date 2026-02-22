@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { getDashboardStats } from '@/lib/store';
 import { formatCurrency } from '@/lib/computations';
 import { DashboardStats } from '@/lib/types';
-import { Building2, FileText, TrendingUp, Landmark, Building, Users } from 'lucide-react';
+import { Building2, FileText, TrendingUp, Landmark, Building, Users, Loader2 } from 'lucide-react';
 
 const statCards = [
   { key: 'total_groups' as const, label: 'Corporate Groups', icon: Building, color: 'text-primary' },
@@ -13,10 +13,17 @@ const statCards = [
 
 export default function Dashboard() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    setStats(getDashboardStats());
+    getDashboardStats().then(setStats).finally(() => setLoading(false));
   }, []);
+
+  if (loading) return (
+    <div className="page-container flex items-center justify-center min-h-[50vh]">
+      <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+    </div>
+  );
 
   if (!stats) return null;
 
