@@ -14,6 +14,7 @@ interface Props {
   open: boolean;
   onClose: () => void;
   onSave: (mod: LeaseModification) => void;
+  leaseStartDate: string;
   currentEndDate: string;
   currentMonthlyAmount: number;
   currentDiscountRate: number;
@@ -27,7 +28,7 @@ const modTypes: { value: ModificationType; label: string; description: string }[
   { value: 'EARLY_TERMINATION', label: 'Early Termination', description: 'Terminate the lease early' },
 ];
 
-export default function ModificationDialog({ open, onClose, onSave, currentEndDate, currentMonthlyAmount, currentDiscountRate }: Props) {
+export default function ModificationDialog({ open, onClose, onSave, leaseStartDate, currentEndDate, currentMonthlyAmount, currentDiscountRate }: Props) {
   const [modType, setModType] = useState<ModificationType>('TERM_CHANGE');
   const [effectiveDate, setEffectiveDate] = useState('');
   const [description, setDescription] = useState('');
@@ -42,6 +43,9 @@ export default function ModificationDialog({ open, onClose, onSave, currentEndDa
 
   const handleSave = () => {
     if (!effectiveDate) { toast.error('Effective date is required'); return; }
+    if (leaseStartDate && effectiveDate < leaseStartDate) {
+      toast.error('Effective/termination date cannot be before lease start date'); return;
+    }
     if (!description.trim()) { toast.error('Description is required'); return; }
     if (isScopeDecrease && (scopeDecreasePercentage <= 0 || scopeDecreasePercentage >= 100)) {
       toast.error('Scope decrease must be between 0% and 100%'); return;

@@ -18,6 +18,44 @@ function getPaymentDates(startDate: string, endDate: string, frequency: string):
   return dates;
 }
 
+/**
+ * Get the number of days in the month of a given date.
+ */
+function getDaysInMonth(date: Date): number {
+  return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
+}
+
+/**
+ * Calculate the pro-rata factor for a partial period.
+ * If the lease starts mid-month, the first payment is proportionate.
+ * If the lease ends mid-month, the last payment is proportionate.
+ */
+function getProRataFactor(
+  paymentDate: Date,
+  isFirst: boolean,
+  isLast: boolean,
+  leaseStartDate: Date,
+  leaseEndDate: Date,
+): number {
+  const daysInMonth = getDaysInMonth(paymentDate);
+
+  if (isFirst && leaseStartDate.getDate() > 1) {
+    // Lease starts mid-month: remaining days / total days in month
+    const remainingDays = daysInMonth - leaseStartDate.getDate() + 1;
+    return remainingDays / daysInMonth;
+  }
+
+  if (isLast) {
+    // Lease ends mid-month: days used / total days in month
+    const dayOfMonth = leaseEndDate.getDate();
+    if (dayOfMonth < daysInMonth) {
+      return dayOfMonth / daysInMonth;
+    }
+  }
+
+  return 1;
+}
+
 function getPaymentAmount(baseAmount: number, frequency: string, escalations: { escalation_start_date: string; escalation_percentage: number }[], date: Date): number {
   let amount = baseAmount;
   if (frequency === 'Quarterly') amount *= 3;
@@ -148,10 +186,21 @@ export function computeLease(lease: Lease): LeaseComputation {
   const allPaymentDates = getPaymentDates(lease.rent_commencement_date, lease.lease_end_date, lease.payment_frequency);
   let initialLiability = 0;
   const initialPayments: { date: Date; amount: number }[] = [];
+  const leaseStart = parseISO(lease.lease_start_date);
 
-  for (const pDate of allPaymentDates) {
+  for (let i = 0; i < allPaymentDates.length; i++) {
+    const pDate = allPaymentDates[i];
     const daysDiff = differenceInDays(pDate, commencementDate);
-    const amount = getPaymentAmount(lease.monthly_lease_amount, lease.payment_frequency, lease.escalations, pDate);
+    let amount = getPaymentAmount(lease.monthly_lease_amount, lease.payment_frequency, lease.escalations, pDate);
+    // Apply pro-rata for partial first/last period
+    const proRata = getProRataFactor(
+      pDate,
+      i === 0,
+      i === allPaymentDates.length - 1,
+      leaseStart,
+      originalEndDate,
+    );
+    amount = amount * proRata;
     const pv = amount / Math.pow(1 + rate, daysDiff / 365);
     initialLiability += pv;
     initialPayments.push({ date: pDate, amount });
