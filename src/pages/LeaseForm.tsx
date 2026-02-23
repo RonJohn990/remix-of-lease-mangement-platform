@@ -98,6 +98,16 @@ export default function LeaseForm() {
     if (!form.lease_start_date || !form.lease_end_date || !form.rent_commencement_date) {
       toast.error('All dates are required'); return;
     }
+    // Date validations
+    if (form.lease_end_date && form.lease_start_date && form.lease_end_date < form.lease_start_date) {
+      toast.error('Lease end date cannot be before lease start date'); return;
+    }
+    if (form.rent_commencement_date && form.lease_start_date && form.rent_commencement_date < form.lease_start_date) {
+      toast.error('Rent commencement date cannot be before lease start date'); return;
+    }
+    if (form.lease_end_date && form.rent_commencement_date && form.lease_end_date < form.rent_commencement_date) {
+      toast.error('Lease end date cannot be before rent commencement date'); return;
+    }
     if (!form.discount_rate_ibr || form.discount_rate_ibr <= 0 || form.discount_rate_ibr >= 100) {
       toast.error('Discount rate must be > 0 and < 100'); return;
     }

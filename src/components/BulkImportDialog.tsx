@@ -140,6 +140,17 @@ export default function BulkImportDialog({ open, onOpenChange, onComplete }: Bul
         if (!row.lease_end_date?.trim()) throw new Error('Missing lease_end_date');
         if (!row.rent_commencement_date?.trim()) throw new Error('Missing rent_commencement_date');
 
+        // Date validations
+        if (row.lease_end_date.trim() < row.lease_start_date.trim()) {
+          throw new Error('Lease end date cannot be before lease start date');
+        }
+        if (row.rent_commencement_date.trim() < row.lease_start_date.trim()) {
+          throw new Error('Rent commencement date cannot be before lease start date');
+        }
+        if (row.lease_end_date.trim() < row.rent_commencement_date.trim()) {
+          throw new Error('Lease end date cannot be before rent commencement date');
+        }
+
         const monthlyAmt = parseFloat(row.monthly_lease_amount);
         if (!monthlyAmt || monthlyAmt <= 0) throw new Error('Invalid monthly_lease_amount');
 

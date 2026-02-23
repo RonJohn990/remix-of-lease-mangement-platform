@@ -359,6 +359,7 @@ export default function LeaseDetail() {
         open={modDialogOpen}
         onClose={() => setModDialogOpen(false)}
         onSave={handleModification}
+        leaseStartDate={lease.lease_start_date}
         currentEndDate={lease.lease_end_date}
         currentMonthlyAmount={lease.monthly_lease_amount}
         currentDiscountRate={lease.discount_rate_ibr}
