@@ -246,11 +246,45 @@ export default function LeaseForm() {
             </div>
             <div>
               <Label>Lease End Date *</Label>
-              <Input type="date" value={form.lease_end_date || ''} onChange={e => update('lease_end_date', e.target.value)} />
+              <Input
+                type="date"
+                value={form.lease_end_date || ''}
+                min={form.lease_start_date || undefined}
+                onChange={e => {
+                  const val = e.target.value;
+                  if (form.lease_start_date && val < form.lease_start_date) {
+                    toast.error('Lease end date cannot be before lease start date');
+                    return;
+                  }
+                  if (form.rent_commencement_date && val < form.rent_commencement_date) {
+                    toast.error('Lease end date cannot be before rent commencement date');
+                    return;
+                  }
+                  update('lease_end_date', val);
+                }}
+              />
+              {form.lease_end_date && form.lease_start_date && form.lease_end_date < form.lease_start_date && (
+                <p className="text-xs text-destructive mt-1">End date is before start date</p>
+              )}
             </div>
             <div>
               <Label>Rent Commencement Date *</Label>
-              <Input type="date" value={form.rent_commencement_date || ''} onChange={e => update('rent_commencement_date', e.target.value)} />
+              <Input
+                type="date"
+                value={form.rent_commencement_date || ''}
+                min={form.lease_start_date || undefined}
+                onChange={e => {
+                  const val = e.target.value;
+                  if (form.lease_start_date && val < form.lease_start_date) {
+                    toast.error('Rent commencement date cannot be before lease start date');
+                    return;
+                  }
+                  update('rent_commencement_date', val);
+                }}
+              />
+              {form.rent_commencement_date && form.lease_start_date && form.rent_commencement_date < form.lease_start_date && (
+                <p className="text-xs text-destructive mt-1">Commencement date is before start date</p>
+              )}
             </div>
           </div>
         </div>
