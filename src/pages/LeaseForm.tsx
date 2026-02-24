@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { addMonths, parseISO, format, isBefore } from 'date-fns';
 import { Lease, Entity, Escalation, PaymentFrequency, PaymentTiming, LeaseClassification } from '@/lib/types';
 import { getEntities, getLease, saveLease, generateId } from '@/lib/store';
 import { supabase } from '@/integrations/supabase/client';
@@ -41,6 +42,10 @@ export default function LeaseForm() {
   const [form, setForm] = useState<Partial<Lease>>(defaultLease);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [escalationMode, setEscalationMode] = useState<'Standard' | 'Custom'>('Custom');
+  const [stdFirstDate, setStdFirstDate] = useState('');
+  const [stdPeriodMonths, setStdPeriodMonths] = useState(12);
+  const [stdPercentage, setStdPercentage] = useState(0);
 
   useEffect(() => {
     const load = async () => {
@@ -92,6 +97,21 @@ export default function LeaseForm() {
   const removeEscalation = (idx: number) => {
     update('escalations', (form.escalations || []).filter((_, i) => i !== idx));
   };
+
+  const generateStandardEscalations = useCallback(() => {
+    if (!stdFirstDate || !form.lease_end_date || stdPercentage <= 0 || stdPeriodMonths <= 0) return;
+    const endDate = parseISO(form.lease_end_date);
+    const escalations: Escalation[] = [];
+    let current = parseISO(stdFirstDate);
+    while (isBefore(current, endDate) || current.getTime() === endDate.getTime()) {
+      escalations.push({
+        escalation_start_date: format(current, 'yyyy-MM-dd'),
+        escalation_percentage: stdPercentage,
+      });
+      current = addMonths(current, stdPeriodMonths);
+    }
+    update('escalations', escalations);
+  }, [stdFirstDate, stdPeriodMonths, stdPercentage, form.lease_end_date]);
 
   const handleSave = async () => {
     if (!form.entity_id) { toast.error('Select an entity'); return; }
@@ -348,25 +368,85 @@ export default function LeaseForm() {
         <div>
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-sm font-semibold text-primary">Escalations</h3>
-            <Button size="sm" variant="outline" onClick={addEscalation}>
-              <Plus className="w-3.5 h-3.5 mr-1" /> Add Escalation
-            </Button>
-          </div>
-          {(form.escalations || []).map((esc, idx) => (
-            <div key={idx} className="flex gap-3 items-end mb-2">
-              <div className="flex-1">
-                <Label>Start Date</Label>
-                <Input type="date" value={esc.escalation_start_date} onChange={e => updateEscalation(idx, 'escalation_start_date', e.target.value)} />
-              </div>
-              <div className="flex-1">
-                <Label>Percentage (%)</Label>
-                <Input type="number" step="0.01" value={esc.escalation_percentage} onChange={e => updateEscalation(idx, 'escalation_percentage', parseFloat(e.target.value) || 0)} />
-              </div>
-              <Button size="icon" variant="ghost" className="text-destructive shrink-0" onClick={() => removeEscalation(idx)}>
-                <Trash2 className="w-4 h-4" />
-              </Button>
+            <div className="flex items-center gap-2">
+              <Label className="text-xs text-muted-foreground">Mode:</Label>
+              <Select value={escalationMode} onValueChange={(v: 'Standard' | 'Custom') => setEscalationMode(v)}>
+                <SelectTrigger className="w-[130px] h-8 text-xs"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Standard">Standard</SelectItem>
+                  <SelectItem value="Custom">Custom</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
-          ))}
+          </div>
+
+          {escalationMode === 'Standard' && (
+            <div className="space-y-3">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div>
+                  <Label>First Escalation Date</Label>
+                  <Input type="date" value={stdFirstDate} onChange={e => setStdFirstDate(e.target.value)} />
+                </div>
+                <div>
+                  <Label>Escalation Every (months)</Label>
+                  <Input type="number" min={1} value={stdPeriodMonths} onChange={e => setStdPeriodMonths(parseInt(e.target.value) || 12)} />
+                  <p className="text-[10px] text-muted-foreground mt-0.5">12 = Annual, 24 = Bi-Annual, etc.</p>
+                </div>
+                <div>
+                  <Label>Default Percentage (%)</Label>
+                  <Input type="number" step="0.01" value={stdPercentage || ''} onChange={e => setStdPercentage(parseFloat(e.target.value) || 0)} />
+                </div>
+              </div>
+              <Button size="sm" variant="outline" onClick={generateStandardEscalations} disabled={!stdFirstDate || !form.lease_end_date || stdPercentage <= 0}>
+                Generate Escalations
+              </Button>
+              {(form.escalations || []).length > 0 && (
+                <div className="mt-3 space-y-2">
+                  <p className="text-xs text-muted-foreground font-medium">Generated escalations (editable):</p>
+                  {(form.escalations || []).map((esc, idx) => (
+                    <div key={idx} className="flex gap-3 items-end">
+                      <div className="flex-1">
+                        <Label className="text-xs">Date</Label>
+                        <Input type="date" value={esc.escalation_start_date} onChange={e => updateEscalation(idx, 'escalation_start_date', e.target.value)} />
+                      </div>
+                      <div className="flex-1">
+                        <Label className="text-xs">Percentage (%)</Label>
+                        <Input type="number" step="0.01" value={esc.escalation_percentage} onChange={e => updateEscalation(idx, 'escalation_percentage', parseFloat(e.target.value) || 0)} />
+                      </div>
+                      <Button size="icon" variant="ghost" className="text-destructive shrink-0" onClick={() => removeEscalation(idx)}>
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {escalationMode === 'Custom' && (
+            <>
+              <div className="flex justify-end mb-2">
+                <Button size="sm" variant="outline" onClick={addEscalation}>
+                  <Plus className="w-3.5 h-3.5 mr-1" /> Add Escalation
+                </Button>
+              </div>
+              {(form.escalations || []).map((esc, idx) => (
+                <div key={idx} className="flex gap-3 items-end mb-2">
+                  <div className="flex-1">
+                    <Label>Start Date</Label>
+                    <Input type="date" value={esc.escalation_start_date} onChange={e => updateEscalation(idx, 'escalation_start_date', e.target.value)} />
+                  </div>
+                  <div className="flex-1">
+                    <Label>Percentage (%)</Label>
+                    <Input type="number" step="0.01" value={esc.escalation_percentage} onChange={e => updateEscalation(idx, 'escalation_percentage', parseFloat(e.target.value) || 0)} />
+                  </div>
+                  <Button size="icon" variant="ghost" className="text-destructive shrink-0" onClick={() => removeEscalation(idx)}>
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
+                </div>
+              ))}
+            </>
+          )}
         </div>
 
         {/* Comments */}
