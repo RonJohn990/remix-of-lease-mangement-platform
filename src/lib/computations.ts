@@ -125,8 +125,8 @@ function buildScheduleSegment(
   paymentTiming: string = 'Arrears',
   frequency: string = 'Monthly',
 ): { schedule: ScheduleRow[]; totalInterest: number; totalDepreciation: number; finalLiability: number; finalROU: number } {
-  const totalDays = differenceInDays(endDate, startDate);
-  const dailyDep = totalDays > 0 ? openingROU / totalDays : 0;
+  const totalPeriods = payments.length;
+  const periodicDep = totalPeriods > 0 ? openingROU / totalPeriods : 0;
   const isAdvance = paymentTiming === 'Advance';
 
   const schedule: ScheduleRow[] = [];
@@ -173,11 +173,9 @@ function buildScheduleSegment(
       }
     }
 
-    // For depreciation: last period extends to endDate so ROU reaches zero
+    // Straight-line depreciation: equal amount per period
+    // Last period absorbs any rounding remainder so ROU reaches exactly zero
     const isLastPeriod = i === payments.length - 1;
-    const depDays = isLastPeriod
-      ? differenceInDays(endDate, prevDate)
-      : daysInPeriod;
 
     let interest: number;
     let closingLiab: number;
@@ -193,8 +191,8 @@ function buildScheduleSegment(
       closingLiab = liab + interest - payment.amount;
     }
 
-    // Depreciation: use depDays to ensure ROU reaches zero at end of lease
-    const dep = isLastPeriod ? rou : dailyDep * depDays;
+    // Straight-line: fixed per period, last period takes remainder
+    const dep = isLastPeriod ? rou : periodicDep;
     const closingROU = rou - dep;
     // Security deposit interest also uses periodic rate
     const depInterest = round2(secDep * rate);
