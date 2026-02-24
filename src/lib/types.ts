@@ -91,6 +91,7 @@ export interface ScheduleRow {
   period_date: string;
   days_in_period: number;
   lease_payment: number;
+  pv_lease_payment: number;
   opening_liability: number;
   interest_expense: number;
   closing_liability: number;

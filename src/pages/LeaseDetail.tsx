@@ -100,10 +100,11 @@ export default function LeaseDetail() {
 
   const exportSchedule = () => {
     if (!computation) return;
-    const headers = ['Period', 'Date', 'Days', 'Payment', 'Opening Liability', 'Interest', 'Closing Liability', 'Opening ROU', 'Depreciation', 'Closing ROU'];
+    const headers = ['Period', 'Date', 'Days', 'Payment', 'PV of Payment', 'Opening Liability', 'Interest', 'Closing Liability', 'Opening ROU', 'Depreciation', 'Closing ROU'];
     const rows = computation.schedule.map(r => [
       r.period.toString(), r.period_date, r.days_in_period.toString(),
-      r.lease_payment.toString(), r.opening_liability.toString(), r.interest_expense.toString(),
+      r.lease_payment.toString(), r.pv_lease_payment.toString(),
+      r.opening_liability.toString(), r.interest_expense.toString(),
       r.closing_liability.toString(), r.opening_rou.toString(), r.depreciation.toString(), r.closing_rou.toString(),
     ]);
     exportCSV(headers, rows, `${lease.lease_name}_schedule.csv`);
@@ -271,6 +272,7 @@ export default function LeaseDetail() {
                       <th className="px-3 py-2 text-left font-medium text-muted-foreground">Date</th>
                       <th className="px-3 py-2 text-right font-medium text-muted-foreground">Days</th>
                       <th className="px-3 py-2 text-right font-medium text-muted-foreground">Payment</th>
+                      <th className="px-3 py-2 text-right font-medium text-muted-foreground">PV of Payment</th>
                       <th className="px-3 py-2 text-right font-medium text-muted-foreground">Open Liab.</th>
                       <th className="px-3 py-2 text-right font-medium text-muted-foreground">Interest</th>
                       <th className="px-3 py-2 text-right font-medium text-muted-foreground">Close Liab.</th>
@@ -287,6 +289,7 @@ export default function LeaseDetail() {
                           <td className="px-3 py-2">{row.period_date}</td>
                           <td className="px-3 py-2 text-right">{row.days_in_period}</td>
                           <td className="px-3 py-2 text-right">{formatCurrency(row.lease_payment)}</td>
+                          <td className="px-3 py-2 text-right">{formatCurrency(row.pv_lease_payment)}</td>
                           <td className="px-3 py-2 text-right">{formatCurrency(row.opening_liability)}</td>
                           <td className="px-3 py-2 text-right">{formatCurrency(row.interest_expense)}</td>
                           <td className="px-3 py-2 text-right">{formatCurrency(row.closing_liability)}</td>
@@ -296,7 +299,7 @@ export default function LeaseDetail() {
                         </tr>
                         {row.is_modification_point && (
                           <tr key={`mod-${row.period}`} className="bg-warning/10 border-y border-warning/30">
-                            <td colSpan={10} className="px-3 py-1.5 text-xs font-medium text-warning flex items-center gap-1.5">
+                            <td colSpan={11} className="px-3 py-1.5 text-xs font-medium text-warning flex items-center gap-1.5">
                               <GitBranch className="w-3 h-3" /> {row.modification_label}
                             </td>
                           </tr>
