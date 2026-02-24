@@ -143,6 +143,7 @@ function buildScheduleSegment(
       period_date: format(startDate, 'yyyy-MM-dd'),
       days_in_period: 0,
       lease_payment: 0,
+      pv_lease_payment: 0,
       opening_liability: round2(openingLiability),
       interest_expense: 0,
       closing_liability: round2(openingLiability),
@@ -198,11 +199,15 @@ function buildScheduleSegment(
     totalInterest += interest;
     totalDepreciation += dep;
 
+    const periodNumber = startPeriod + i;
+    const pvPayment = round2(payment.amount / Math.pow(1 + rate, isAdvance ? periodNumber - 1 : periodNumber));
+
     schedule.push({
-      period: startPeriod + i,
+      period: periodNumber,
       period_date: !isAdvance ? format(getEndOfPeriodDate(payment.date, frequency), 'yyyy-MM-dd') : format(payment.date, 'yyyy-MM-dd'),
       days_in_period: daysInPeriod,
       lease_payment: round2(payment.amount),
+      pv_lease_payment: pvPayment,
       opening_liability: round2(liab),
       interest_expense: round2(interest),
       closing_liability: round2(closingLiab),
