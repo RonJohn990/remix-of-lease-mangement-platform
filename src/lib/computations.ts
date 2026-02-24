@@ -103,9 +103,11 @@ function buildScheduleSegment(
   openingROU: number,
   securityDeposit: number,
   startPeriod: number,
+  paymentTiming: string = 'Arrears',
 ): { schedule: ScheduleRow[]; totalInterest: number; totalDepreciation: number; finalLiability: number; finalROU: number } {
   const totalDays = differenceInDays(endDate, startDate);
   const dailyDep = totalDays > 0 ? openingROU / totalDays : 0;
+  const isAdvance = paymentTiming === 'Advance';
 
   const schedule: ScheduleRow[] = [];
   let liab = openingLiability;
@@ -119,9 +121,20 @@ function buildScheduleSegment(
     const prevDate = i === 0 ? startDate : payments[i - 1].date;
     const daysInPeriod = differenceInDays(payment.date, prevDate);
 
-    // Use periodic rate directly per period (not daily accrual)
-    const interest = round2(liab * rate);
-    const closingLiab = liab + interest - payment.amount;
+    let interest: number;
+    let closingLiab: number;
+
+    if (isAdvance) {
+      // Advance: payment first, then interest accrues on reduced balance
+      const liabAfterPayment = liab - payment.amount;
+      interest = round2(liabAfterPayment * rate);
+      closingLiab = liabAfterPayment + interest;
+    } else {
+      // Arrears: interest accrues first, then payment
+      interest = round2(liab * rate);
+      closingLiab = liab + interest - payment.amount;
+    }
+
     const dep = dailyDep * daysInPeriod;
     const closingROU = rou - dep;
     // Security deposit interest also uses periodic rate
@@ -201,7 +214,8 @@ export function computeLease(lease: Lease): LeaseComputation {
   const originalEndDate = parseISO(lease.lease_end_date);
   const annualRate = lease.discount_rate_ibr / 100;
   const periodicRate = getPeriodicRate(annualRate, lease.payment_frequency);
-
+  const paymentTiming = lease.payment_timing || 'Arrears';
+  const isAdvance = paymentTiming === 'Advance';
   // Step 1: Calculate initial PV using periodic discounting
   const allPaymentDates = getPaymentDates(lease.rent_commencement_date, lease.lease_end_date, lease.payment_frequency);
   let initialLiability = 0;
@@ -220,8 +234,9 @@ export function computeLease(lease: Lease): LeaseComputation {
       originalEndDate,
     );
     amount = amount * proRata;
-    // Discount using periodic rate: PV = amount / (1 + periodicRate)^period_number
-    const periodNumber = i + 1;
+    // For Advance: first payment at period 0 (not discounted), rest at 1, 2, ...
+    // For Arrears: payments at period 1, 2, 3, ...
+    const periodNumber = isAdvance ? i : i + 1;
     const pv = amount / Math.pow(1 + periodicRate, periodNumber);
     initialLiability += pv;
     initialPayments.push({ date: pDate, amount });
@@ -233,7 +248,7 @@ export function computeLease(lease: Lease): LeaseComputation {
   if (modifications.length === 0) {
     const result = buildScheduleSegment(
       initialPayments, commencementDate, originalEndDate, periodicRate,
-      initialLiability, initialROU, lease.security_deposit || 0, 1
+      initialLiability, initialROU, lease.security_deposit || 0, 1, paymentTiming
     );
     return {
       lease_id: lease.lease_id,
@@ -279,7 +294,7 @@ export function computeLease(lease: Lease): LeaseComputation {
     if (preModPayments.length > 0) {
       const preResult = buildScheduleSegment(
         preModPayments, currentStartDate, currentEndDate, currentRate,
-        currentLiab, currentROU, lease.security_deposit || 0, periodCounter
+        currentLiab, currentROU, lease.security_deposit || 0, periodCounter, paymentTiming
       );
       fullSchedule.push(...preResult.schedule);
       totalInterest += preResult.totalInterest;
@@ -330,7 +345,7 @@ export function computeLease(lease: Lease): LeaseComputation {
     for (let pi = 0; pi < futurePaymentDates.length; pi++) {
       const pDate = futurePaymentDates[pi];
       const amount = getPaymentAmount(newMonthlyAmt, lease.payment_frequency, currentEscalations, pDate);
-      const periodNumber = pi + 1;
+      const periodNumber = isAdvance ? pi : pi + 1;
       const pv = amount / Math.pow(1 + newPeriodicRate, periodNumber);
       newLiability += pv;
       futurePayments.push({ date: pDate, amount });
@@ -385,7 +400,7 @@ export function computeLease(lease: Lease): LeaseComputation {
     if (mi === modifications.length - 1 && futurePayments.length > 0) {
       const postResult = buildScheduleSegment(
         futurePayments, modDate, newEndDate, newPeriodicRate,
-        currentLiab, currentROU, lease.security_deposit || 0, periodCounter
+        currentLiab, currentROU, lease.security_deposit || 0, periodCounter, paymentTiming
       );
       fullSchedule.push(...postResult.schedule);
       totalInterest += postResult.totalInterest;

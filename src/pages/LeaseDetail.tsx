@@ -233,6 +233,7 @@ export default function LeaseDetail() {
           <div><span className="text-muted-foreground">End Date:</span> <span className="ml-1 font-medium">{lease.lease_end_date}</span></div>
           <div><span className="text-muted-foreground">Commencement:</span> <span className="ml-1 font-medium">{lease.rent_commencement_date}</span></div>
           <div><span className="text-muted-foreground">Frequency:</span> <span className="ml-1 font-medium">{lease.payment_frequency}</span></div>
+          <div><span className="text-muted-foreground">Payment Timing:</span> <span className="ml-1 font-medium">{lease.payment_timing === 'Advance' ? 'In Advance' : 'In Arrears'}</span></div>
           <div><span className="text-muted-foreground">Monthly Amount:</span> <span className="ml-1 font-medium">{formatCurrency(lease.monthly_lease_amount)}</span></div>
           <div><span className="text-muted-foreground">Discount Rate:</span> <span className="ml-1 font-medium">{lease.discount_rate_ibr}%</span></div>
           <div><span className="text-muted-foreground">Security Deposit:</span> <span className="ml-1 font-medium">{formatCurrency(lease.security_deposit)}</span></div>

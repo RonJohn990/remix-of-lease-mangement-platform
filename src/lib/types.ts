@@ -18,7 +18,8 @@ export interface Entity {
   created_at: string;
 }
 
-export type PaymentFrequency = 'Monthly' | 'Quarterly' | 'Annual';
+export type PaymentFrequency = 'Monthly' | 'Quarterly' | 'Half-Yearly' | 'Annual';
+export type PaymentTiming = 'Advance' | 'Arrears';
 export type LeaseEvent = 'INITIAL' | 'MODIFICATION' | 'TERMINATION';
 export type LeaseStatus = 'Active' | 'Terminated';
 export type LeaseClassification = 'Finance' | 'Operating';
@@ -37,6 +38,7 @@ export interface Lease {
   concerned_person: string;
   lease_comments: string;
   payment_frequency: PaymentFrequency;
+  payment_timing: PaymentTiming;
   lease_type: string;
   lease_classification: LeaseClassification;
   lease_start_date: string;

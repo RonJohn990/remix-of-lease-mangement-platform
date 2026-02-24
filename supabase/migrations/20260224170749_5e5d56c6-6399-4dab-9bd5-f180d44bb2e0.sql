@@ -1,0 +1,1 @@
+ALTER TABLE public.leases ADD COLUMN payment_timing text NOT NULL DEFAULT 'Arrears';

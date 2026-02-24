@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Lease, Entity, Escalation, PaymentFrequency, LeaseClassification } from '@/lib/types';
+import { Lease, Entity, Escalation, PaymentFrequency, PaymentTiming, LeaseClassification } from '@/lib/types';
 import { getEntities, getLease, saveLease, generateId } from '@/lib/store';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -16,6 +16,7 @@ const defaultLease: Partial<Lease> = {
   lease_version: 1,
   lease_event: 'INITIAL',
   payment_frequency: 'Monthly',
+  payment_timing: 'Arrears',
   lease_type: '',
   lease_classification: 'Finance',
   discount_rate_ibr: 8,
@@ -68,7 +69,7 @@ export default function LeaseForm() {
       const end = new Date(form.lease_end_date);
       if (end > start) {
         const totalMonths = (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth());
-        const divisor = form.payment_frequency === 'Quarterly' ? 3 : form.payment_frequency === 'Annual' ? 12 : 1;
+        const divisor = form.payment_frequency === 'Quarterly' ? 3 : form.payment_frequency === 'Half-Yearly' ? 6 : form.payment_frequency === 'Annual' ? 12 : 1;
         const installments = Math.ceil(totalMonths / divisor);
         setForm(prev => ({ ...prev, number_installments: installments }));
       }
@@ -229,7 +230,18 @@ export default function LeaseForm() {
                 <SelectContent>
                   <SelectItem value="Monthly">Monthly</SelectItem>
                   <SelectItem value="Quarterly">Quarterly</SelectItem>
+                  <SelectItem value="Half-Yearly">Half-Yearly</SelectItem>
                   <SelectItem value="Annual">Annual</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Payment Timing</Label>
+              <Select value={form.payment_timing || 'Arrears'} onValueChange={(v: PaymentTiming) => update('payment_timing', v)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Arrears">In Arrears (End of Period)</SelectItem>
+                  <SelectItem value="Advance">In Advance (Beginning of Period)</SelectItem>
                 </SelectContent>
               </Select>
             </div>

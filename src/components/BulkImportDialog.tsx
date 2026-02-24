@@ -194,6 +194,7 @@ export default function BulkImportDialog({ open, onOpenChange, onComplete }: Bul
           concerned_person: row.concerned_person?.trim() || '',
           lease_comments: row.lease_comments?.trim() || '',
           payment_frequency: paymentFrequency as any,
+          payment_timing: (row.payment_timing?.trim() === 'Advance' ? 'Advance' : 'Arrears') as any,
           lease_type: row.lease_type?.trim() || '',
           lease_classification: leaseClassification as any,
           lease_start_date: row.lease_start_date.trim(),

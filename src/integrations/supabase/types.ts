@@ -136,6 +136,7 @@ export type Database = {
           monthly_lease_amount: number
           number_installments: number
           payment_frequency: string
+          payment_timing: string
           rent_commencement_date: string
           security_deposit: number
           short_term_flag: boolean
@@ -166,6 +167,7 @@ export type Database = {
           monthly_lease_amount?: number
           number_installments?: number
           payment_frequency?: string
+          payment_timing?: string
           rent_commencement_date: string
           security_deposit?: number
           short_term_flag?: boolean
@@ -196,6 +198,7 @@ export type Database = {
           monthly_lease_amount?: number
           number_installments?: number
           payment_frequency?: string
+          payment_timing?: string
           rent_commencement_date?: string
           security_deposit?: number
           short_term_flag?: boolean
