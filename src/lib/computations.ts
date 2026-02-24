@@ -151,7 +151,7 @@ function buildScheduleSegment(
       depreciation: 0,
       closing_rou: 0,
       current_liability: 0,
-      non_current_liability: round2(openingLiability),
+      non_current_liability: 0,
       security_deposit_opening: round2(securityDeposit),
       interest_deposit: 0,
       security_deposit_closing: round2(securityDeposit),
