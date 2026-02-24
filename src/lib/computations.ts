@@ -163,6 +163,12 @@ function buildScheduleSegment(
     const prevDate = i === 0 ? startDate : payments[i - 1].date;
     const daysInPeriod = differenceInDays(payment.date, prevDate);
 
+    // For depreciation: last period extends to endDate so ROU reaches zero
+    const isLastPeriod = i === payments.length - 1;
+    const depDays = isLastPeriod
+      ? differenceInDays(endDate, prevDate)
+      : daysInPeriod;
+
     let interest: number;
     let closingLiab: number;
 
@@ -177,7 +183,8 @@ function buildScheduleSegment(
       closingLiab = liab + interest - payment.amount;
     }
 
-    const dep = dailyDep * daysInPeriod;
+    // Depreciation: use depDays to ensure ROU reaches zero at end of lease
+    const dep = isLastPeriod ? rou : dailyDep * depDays;
     const closingROU = rou - dep;
     // Security deposit interest also uses periodic rate
     const depInterest = round2(secDep * rate);
