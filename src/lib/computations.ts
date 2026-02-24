@@ -161,7 +161,17 @@ function buildScheduleSegment(
   for (let i = 0; i < payments.length; i++) {
     const payment = payments[i];
     const prevDate = i === 0 ? startDate : payments[i - 1].date;
-    const daysInPeriod = differenceInDays(payment.date, prevDate);
+    let daysInPeriod = differenceInDays(payment.date, prevDate);
+
+    // Fix: For Arrears, the first payment date equals startDate so daysInPeriod = 0.
+    // Use days to the next payment (or end of period) for correct depreciation.
+    if (daysInPeriod === 0 && i === 0 && !isAdvance) {
+      if (i + 1 < payments.length) {
+        daysInPeriod = differenceInDays(payments[i + 1].date, startDate);
+      } else {
+        daysInPeriod = differenceInDays(endDate, startDate);
+      }
+    }
 
     // For depreciation: last period extends to endDate so ROU reaches zero
     const isLastPeriod = i === payments.length - 1;
