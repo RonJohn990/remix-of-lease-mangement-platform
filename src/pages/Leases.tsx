@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { useNavigate } from 'react-router-dom';
 import { Plus, Search, Trash2, Eye, Edit2, FileText, Loader2, Upload } from 'lucide-react';
 import { toast } from 'sonner';
+import { safeErrorMessage } from '@/lib/safeError';
 import { formatCurrency } from '@/lib/computations';
 import BulkImportDialog from '@/components/BulkImportDialog';
 
@@ -36,7 +37,7 @@ export default function Leases() {
         await deleteLease(id);
         await reload();
         toast.success('Lease deleted');
-      } catch (e: any) { toast.error(e.message); }
+      } catch (e: any) { toast.error(safeErrorMessage(e, 'Failed to delete lease')); }
     }
   };
 

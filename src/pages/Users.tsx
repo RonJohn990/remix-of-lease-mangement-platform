@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { Users as UsersIcon, Plus, Trash2, Shield, Loader2, Edit2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { safeErrorMessage } from '@/lib/safeError';
 import { CorporateGroup, Entity } from '@/lib/types';
 import { getGroups, getEntities } from '@/lib/store';
 
@@ -103,7 +104,7 @@ export default function Users() {
       await reload();
       toast.success('User created successfully');
     } catch (e: any) {
-      toast.error(e.message || 'Failed to create user');
+      toast.error(safeErrorMessage(e, 'Failed to create user'));
     } finally {
       setSaving(false);
     }
@@ -129,7 +130,7 @@ export default function Users() {
       await reload();
       toast.success('Assignment added');
     } catch (e: any) {
-      toast.error(e.message || 'Failed to assign');
+      toast.error(safeErrorMessage(e, 'Failed to assign'));
     } finally {
       setSaving(false);
     }
@@ -141,7 +142,7 @@ export default function Users() {
       await reload();
       toast.success('Assignment removed');
     } catch (e: any) {
-      toast.error(e.message);
+      toast.error(safeErrorMessage(e, 'Failed to remove assignment'));
     }
   };
 
@@ -163,7 +164,7 @@ export default function Users() {
       await reload();
       toast.success('Role updated');
     } catch (e: any) {
-      toast.error(e.message || 'Failed to update role');
+      toast.error(safeErrorMessage(e, 'Failed to update role'));
     } finally { setSaving(false); }
   };
 

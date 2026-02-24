@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Plus, Trash2, Edit2, Loader2, Car, Building2, ShieldCheck } from 'lucide-react';
 import { toast } from 'sonner';
+import { safeErrorMessage } from '@/lib/safeError';
 
 interface MasterItem {
   id: string;
@@ -89,7 +90,7 @@ export default function MasterConfig() {
       await reload();
       toast.success('Saved');
     } catch (e: any) {
-      toast.error(e.message || 'Failed to save');
+      toast.error(safeErrorMessage(e, 'Failed to save'));
     } finally { setSaving(false); }
   };
 
@@ -104,7 +105,7 @@ export default function MasterConfig() {
       await reload();
       toast.success('Deleted');
     } catch (e: any) {
-      toast.error(e.message || 'Failed to delete');
+      toast.error(safeErrorMessage(e, 'Failed to delete'));
     }
   };
 
@@ -138,7 +139,7 @@ export default function MasterConfig() {
       await reload();
       toast.success('Saved');
     } catch (e: any) {
-      toast.error(e.message || 'Failed to save role');
+      toast.error(safeErrorMessage(e, 'Failed to save role'));
     } finally { setSaving(false); }
   };
 
@@ -150,7 +151,7 @@ export default function MasterConfig() {
       await reload();
       toast.success('Deleted');
     } catch (e: any) {
-      toast.error(e.message || 'Failed to delete');
+      toast.error(safeErrorMessage(e, 'Failed to delete'));
     }
   };
 

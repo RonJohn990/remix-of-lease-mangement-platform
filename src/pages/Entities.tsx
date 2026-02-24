@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { Building2, Building, Plus, Trash2, Edit2, Loader2, MapPin, UserPlus } from 'lucide-react';
 import { toast } from 'sonner';
+import { safeErrorMessage } from '@/lib/safeError';
 import { useLocation } from 'react-router-dom';
 
 interface UserProfile {
@@ -88,7 +89,7 @@ export default function Entities() {
       await reload();
       toast.success('Corporate group saved');
     } catch (e: any) {
-      toast.error(e.message || 'Failed to save');
+      toast.error(safeErrorMessage(e, 'Failed to save'));
     } finally { setSaving(false); }
   };
 
@@ -112,7 +113,7 @@ export default function Entities() {
       await reload();
       toast.success('Entity saved');
     } catch (e: any) {
-      toast.error(e.message || 'Failed to save');
+      toast.error(safeErrorMessage(e, 'Failed to save'));
     } finally { setSaving(false); }
   };
 
@@ -133,7 +134,7 @@ export default function Entities() {
         await deleteGroup(id);
         await reload();
         toast.success('Group deleted');
-      } catch (e: any) { toast.error(e.message); }
+      } catch (e: any) { toast.error(safeErrorMessage(e, 'Failed to delete group')); }
     }
   };
 
@@ -143,7 +144,7 @@ export default function Entities() {
         await deleteEntity(id);
         await reload();
         toast.success('Entity deleted');
-      } catch (e: any) { toast.error(e.message); }
+      } catch (e: any) { toast.error(safeErrorMessage(e, 'Failed to delete entity')); }
     }
   };
 
@@ -187,7 +188,7 @@ export default function Entities() {
       await reload();
       toast.success('User assigned to entity');
     } catch (e: any) {
-      toast.error(e.message || 'Failed to assign');
+      toast.error(safeErrorMessage(e, 'Failed to assign'));
     } finally { setSaving(false); }
   };
 
@@ -196,7 +197,7 @@ export default function Entities() {
       await supabase.from('user_entity_assignments').delete().eq('id', assignmentId);
       await reload();
       toast.success('Assignment removed');
-    } catch (e: any) { toast.error(e.message); }
+    } catch (e: any) { toast.error(safeErrorMessage(e, 'Failed to remove assignment')); }
   };
 
   const getEntityAssignments = (entityId: string) => 

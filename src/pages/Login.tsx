@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Building, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { safeErrorMessage } from '@/lib/safeError';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -32,7 +33,7 @@ export default function Login() {
     e.preventDefault();
     setLoading(true);
     const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) toast.error(error.message);
+    if (error) toast.error(safeErrorMessage(error));
     setLoading(false);
   };
 
@@ -44,7 +45,7 @@ export default function Login() {
       body: { email, password, full_name: fullName },
     });
     if (error || data?.error) {
-      toast.error(data?.error || error?.message || 'Setup failed');
+      toast.error(safeErrorMessage(data?.error || error, 'Setup failed'));
     } else {
       toast.success('Admin created! Signing in...');
       await supabase.auth.signInWithPassword({ email, password });

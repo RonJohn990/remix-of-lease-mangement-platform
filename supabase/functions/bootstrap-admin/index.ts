@@ -1,9 +1,15 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { z } from 'https://esm.sh/zod@3.23.8'
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+const allowedOrigins = (Deno.env.get('ALLOWED_ORIGINS') || '').split(',').map(s => s.trim()).filter(Boolean)
+
+function getCorsHeaders(req: Request) {
+  const origin = req.headers.get('Origin') || ''
+  const allowed = allowedOrigins.length === 0 || allowedOrigins.includes(origin)
+  return {
+    'Access-Control-Allow-Origin': allowed ? origin : allowedOrigins[0] || '*',
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
+  }
 }
 
 const bootstrapSchema = z.object({
@@ -25,6 +31,8 @@ function safeErrorMessage(error: unknown): string {
 }
 
 Deno.serve(async (req) => {
+  const corsHeaders = getCorsHeaders(req)
+
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
@@ -71,6 +79,23 @@ Deno.serve(async (req) => {
     }
 
     const { email, password, full_name } = parsed.data
+
+    // Use advisory lock to prevent race condition during bootstrap
+    const { data: lockResult } = await adminClient.rpc('pg_try_advisory_lock' as any, { key: 1 } as any).maybeSingle()
+
+    // Double-check admin doesn't exist after acquiring lock
+    const { data: recheck } = await adminClient
+      .from('user_roles')
+      .select('id')
+      .eq('role', 'admin')
+      .limit(1)
+
+    if (recheck && recheck.length > 0) {
+      return new Response(JSON.stringify({ error: 'Admin already exists. Use the login page.' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
 
     const { data: newUser, error: createError } = await adminClient.auth.admin.createUser({
       email,

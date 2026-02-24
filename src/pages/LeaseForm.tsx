@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
+import { safeErrorMessage } from '@/lib/safeError';
 import { Plus, Trash2, ArrowLeft, Save, Loader2 } from 'lucide-react';
 
 const defaultLease: Partial<Lease> = {
@@ -151,7 +152,7 @@ export default function LeaseForm() {
       toast.success('Lease saved');
       navigate(`/leases/${lease.lease_id}`);
     } catch (e: any) {
-      toast.error(e.message || 'Failed to save');
+      toast.error(safeErrorMessage(e, 'Failed to save'));
     } finally { setSaving(false); }
   };
 
