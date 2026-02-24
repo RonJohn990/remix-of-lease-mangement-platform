@@ -116,6 +116,27 @@ function buildScheduleSegment(
   let totalInterest = 0;
   let totalDepreciation = 0;
 
+  // For Arrears: insert an opening balance row at the start date (period 0)
+  if (!isAdvance && startPeriod === 1) {
+    schedule.push({
+      period: 0,
+      period_date: format(startDate, 'yyyy-MM-dd'),
+      days_in_period: 0,
+      lease_payment: 0,
+      opening_liability: round2(openingLiability),
+      interest_expense: 0,
+      closing_liability: round2(openingLiability),
+      opening_rou: round2(openingROU),
+      depreciation: 0,
+      closing_rou: round2(openingROU),
+      current_liability: 0,
+      non_current_liability: round2(openingLiability),
+      security_deposit_opening: round2(securityDeposit),
+      interest_deposit: 0,
+      security_deposit_closing: round2(securityDeposit),
+    });
+  }
+
   for (let i = 0; i < payments.length; i++) {
     const payment = payments[i];
     const prevDate = i === 0 ? startDate : payments[i - 1].date;
