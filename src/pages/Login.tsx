@@ -65,7 +65,7 @@ export default function Login() {
           <div className="w-12 h-12 rounded-xl bg-primary flex items-center justify-center mb-4">
             <Building className="w-6 h-6 text-primary-foreground" />
           </div>
-          <h1 className="text-xl font-bold text-foreground">IFRS 16 / Ind AS 116 Lease Manager</h1>
+          <h1 className="text-xl font-bold text-foreground">Lease Management Solution</h1>
           <p className="text-sm text-muted-foreground mt-1">
             {setupMode ? 'Create your admin account to get started' : 'Sign in to continue'}
           </p>
