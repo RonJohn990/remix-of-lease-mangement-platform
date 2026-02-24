@@ -1,4 +1,5 @@
 import { useState, useRef } from 'react';
+import { addMonths, parseISO, format, isBefore } from 'date-fns';
 import Papa from 'papaparse';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -25,6 +26,7 @@ const OPTIONAL_COLUMNS = [
   'lease_comments', 'payment_frequency', 'payment_timing', 'lease_type', 'lease_classification',
   'number_installments', 'security_deposit', 'initial_direct_cost',
   'short_term_flag', 'low_value_flag',
+  'escalation_frequency_months', 'escalation_first_date', 'escalation_default_percentage',
 ];
 
 // Template includes 10 escalation pairs; import supports unlimited
@@ -166,16 +168,37 @@ export default function BulkImportDialog({ open, onOpenChange, onComplete }: Bul
         const validClass = ['Finance', 'Operating'];
         const leaseClassification = validClass.includes(classification) ? classification : 'Finance';
 
-        // Parse escalations dynamically (unlimited columns: escalation_1_date, escalation_1_percentage, ...)
-        const escalations: { escalation_start_date: string; escalation_percentage: number }[] = [];
+        // Parse escalations: custom columns take priority over standard
+        let escalations: { escalation_start_date: string; escalation_percentage: number }[] = [];
+
+        // Check for custom escalation columns first
         for (let e = 1; ; e++) {
           const eDate = row[`escalation_${e}_date`]?.trim();
           const ePct = parseFloat(row[`escalation_${e}_percentage`]);
-          if (!eDate && isNaN(ePct)) break; // No more escalation columns
+          if (!eDate && isNaN(ePct)) break;
           if (eDate && !isNaN(ePct) && ePct > 0) {
             escalations.push({ escalation_start_date: eDate, escalation_percentage: ePct });
           }
         }
+
+        // If no custom escalations, try standard escalation generation
+        if (escalations.length === 0) {
+          const stdFirstDate = row.escalation_first_date?.trim();
+          const stdFreqMonths = parseInt(row.escalation_frequency_months);
+          const stdPct = parseFloat(row.escalation_default_percentage);
+          if (stdFirstDate && stdFreqMonths > 0 && stdPct > 0 && row.lease_end_date?.trim()) {
+            const endDate = parseISO(row.lease_end_date.trim());
+            let current = parseISO(stdFirstDate);
+            while (isBefore(current, endDate) || current.getTime() === endDate.getTime()) {
+              escalations.push({
+                escalation_start_date: format(current, 'yyyy-MM-dd'),
+                escalation_percentage: stdPct,
+              });
+              current = addMonths(current, stdFreqMonths);
+            }
+          }
+        }
+
         // Validate escalation dates are sequential
         for (let e = 1; e < escalations.length; e++) {
           if (escalations[e].escalation_start_date <= escalations[e - 1].escalation_start_date) {
