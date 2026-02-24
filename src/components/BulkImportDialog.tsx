@@ -22,17 +22,18 @@ const REQUIRED_COLUMNS = [
 
 const OPTIONAL_COLUMNS = [
   'vendor_name', 'tagged_employee', 'asset_unit', 'concerned_person',
-  'lease_comments', 'payment_frequency', 'lease_type', 'lease_classification',
+  'lease_comments', 'payment_frequency', 'payment_timing', 'lease_type', 'lease_classification',
   'number_installments', 'security_deposit', 'initial_direct_cost',
   'short_term_flag', 'low_value_flag',
-  'escalation_1_date', 'escalation_1_percentage',
-  'escalation_2_date', 'escalation_2_percentage',
-  'escalation_3_date', 'escalation_3_percentage',
-  'escalation_4_date', 'escalation_4_percentage',
-  'escalation_5_date', 'escalation_5_percentage',
 ];
 
-const ALL_COLUMNS = [...REQUIRED_COLUMNS, ...OPTIONAL_COLUMNS];
+// Template includes 10 escalation pairs; import supports unlimited
+const TEMPLATE_ESCALATION_COUNT = 10;
+const TEMPLATE_ESCALATION_COLUMNS = Array.from({ length: TEMPLATE_ESCALATION_COUNT }, (_, i) => [
+  `escalation_${i + 1}_date`, `escalation_${i + 1}_percentage`,
+]).flat();
+
+const ALL_COLUMNS = [...REQUIRED_COLUMNS, ...OPTIONAL_COLUMNS, ...TEMPLATE_ESCALATION_COLUMNS];
 
 interface RowResult {
   row: number;
@@ -158,18 +159,19 @@ export default function BulkImportDialog({ open, onOpenChange, onComplete }: Bul
         if (!discountRate || discountRate <= 0 || discountRate >= 100) throw new Error('Invalid discount_rate_ibr');
 
         const freq = row.payment_frequency?.trim();
-        const validFreqs = ['Monthly', 'Quarterly', 'Annual'];
+        const validFreqs = ['Monthly', 'Quarterly', 'Half-Yearly', 'Annual'];
         const paymentFrequency = validFreqs.includes(freq) ? freq : 'Monthly';
 
         const classification = row.lease_classification?.trim();
         const validClass = ['Finance', 'Operating'];
         const leaseClassification = validClass.includes(classification) ? classification : 'Finance';
 
-        // Parse escalations (up to 5)
+        // Parse escalations dynamically (unlimited columns: escalation_1_date, escalation_1_percentage, ...)
         const escalations: { escalation_start_date: string; escalation_percentage: number }[] = [];
-        for (let e = 1; e <= 5; e++) {
+        for (let e = 1; ; e++) {
           const eDate = row[`escalation_${e}_date`]?.trim();
           const ePct = parseFloat(row[`escalation_${e}_percentage`]);
+          if (!eDate && isNaN(ePct)) break; // No more escalation columns
           if (eDate && !isNaN(ePct) && ePct > 0) {
             escalations.push({ escalation_start_date: eDate, escalation_percentage: ePct });
           }
