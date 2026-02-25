@@ -1,15 +1,16 @@
-import { useEffect, useState } from 'react';
-import { getLeases, getEntities } from '@/lib/store';
+import { useEffect, useState, useMemo } from 'react';
+import { getLeases, getEntities, getGroups } from '@/lib/store';
 import { computeLease, generateJournalEntries, formatCurrency } from '@/lib/computations';
-import { Lease, Entity, LeaseComputation } from '@/lib/types';
+import { Lease, Entity, CorporateGroup, LeaseComputation } from '@/lib/types';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Download, FileSpreadsheet, Loader2, Filter } from 'lucide-react';
+import { Download, FileSpreadsheet, Loader2, Filter, Search } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { parseISO, isAfter, isBefore, format } from 'date-fns';
+import MultiSelectFilter from '@/components/MultiSelectFilter';
 
 type ReportType = 'schedule' | 'journal' | 'summary' | 'version_history' | 'payment_schedule' | 'present_value';
 
@@ -18,40 +19,94 @@ const round2 = (v: number) => Math.round(v * 100) / 100;
 export default function Reports() {
   const [leases, setLeases] = useState<Lease[]>([]);
   const [entities, setEntities] = useState<Entity[]>([]);
+  const [groups, setGroups] = useState<CorporateGroup[]>([]);
   const [leaseTypes, setLeaseTypes] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Filters
   const [periodFrom, setPeriodFrom] = useState('');
   const [periodTo, setPeriodTo] = useState('');
-  const [entityFilter, setEntityFilter] = useState('all');
-  const [leaseTypeFilter, setLeaseTypeFilter] = useState('all');
+  const [selectedGroups, setSelectedGroups] = useState<string[]>([]);
+  const [selectedEntities, setSelectedEntities] = useState<string[]>([]);
+  const [selectedLeaseTypes, setSelectedLeaseTypes] = useState<string[]>([]);
+  const [selectedLeases, setSelectedLeases] = useState<string[]>([]);
+  const [leaseSearch, setLeaseSearch] = useState('');
   const [classificationFilter, setClassificationFilter] = useState('all');
   const [reportType, setReportType] = useState<ReportType>('summary');
 
   useEffect(() => {
     const load = async () => {
-      const [l, e, ltRes] = await Promise.all([
+      const [l, e, g, ltRes] = await Promise.all([
         getLeases(),
         getEntities(),
+        getGroups(),
         supabase.from('lease_types').select('lease_type_name').order('created_at'),
       ]);
       setLeases(l);
       setEntities(e);
+      setGroups(g);
       setLeaseTypes((ltRes.data || []).map((r: any) => r.lease_type_name));
       setLoading(false);
     };
     load();
   }, []);
 
-  const filteredLeases = leases.filter(l => {
-    if (entityFilter !== 'all' && l.entity_id !== entityFilter) return false;
-    if (leaseTypeFilter !== 'all' && l.lease_type !== leaseTypeFilter) return false;
-    if (classificationFilter !== 'all' && l.lease_classification !== classificationFilter) return false;
-    if (periodFrom && isBefore(parseISO(l.lease_end_date), parseISO(periodFrom))) return false;
-    if (periodTo && isAfter(parseISO(l.lease_start_date), parseISO(periodTo))) return false;
-    return true;
-  });
+  // Entities filtered by selected groups
+  const filteredEntityOptions = useMemo(() => {
+    if (selectedGroups.length === 0) return entities;
+    return entities.filter(e => selectedGroups.includes(e.corporate_id));
+  }, [entities, selectedGroups]);
+
+  // Reset entity selection when group changes
+  useEffect(() => {
+    if (selectedEntities.length > 0) {
+      const validIds = new Set(filteredEntityOptions.map(e => e.entity_id));
+      const valid = selectedEntities.filter(id => validIds.has(id));
+      if (valid.length !== selectedEntities.length) setSelectedEntities(valid);
+    }
+  }, [filteredEntityOptions, selectedEntities]);
+
+  // Pre-filter leases by group, entity, type, classification
+  const preFilteredLeases = useMemo(() => {
+    return leases.filter(l => {
+      if (selectedGroups.length > 0) {
+        const entity = entities.find(e => e.entity_id === l.entity_id);
+        if (!entity || !selectedGroups.includes(entity.corporate_id)) return false;
+      }
+      if (selectedEntities.length > 0 && !selectedEntities.includes(l.entity_id)) return false;
+      if (selectedLeaseTypes.length > 0 && !selectedLeaseTypes.includes(l.lease_type)) return false;
+      if (classificationFilter !== 'all' && l.lease_classification !== classificationFilter) return false;
+      if (periodFrom && isBefore(parseISO(l.lease_end_date), parseISO(periodFrom))) return false;
+      if (periodTo && isAfter(parseISO(l.lease_start_date), parseISO(periodTo))) return false;
+      return true;
+    });
+  }, [leases, entities, selectedGroups, selectedEntities, selectedLeaseTypes, classificationFilter, periodFrom, periodTo]);
+
+  // Reset selected leases when pre-filters change
+  useEffect(() => {
+    if (selectedLeases.length > 0) {
+      const validIds = new Set(preFilteredLeases.map(l => l.lease_id));
+      const valid = selectedLeases.filter(id => validIds.has(id));
+      if (valid.length !== selectedLeases.length) setSelectedLeases(valid);
+    }
+  }, [preFilteredLeases, selectedLeases]);
+
+  // Leases available for selection (matching search)
+  const searchableLeases = useMemo(() => {
+    if (!leaseSearch) return preFilteredLeases;
+    const q = leaseSearch.toLowerCase();
+    return preFilteredLeases.filter(l =>
+      l.lease_name.toLowerCase().includes(q) ||
+      l.lease_id.toLowerCase().includes(q) ||
+      l.legal_entity_name.toLowerCase().includes(q)
+    );
+  }, [preFilteredLeases, leaseSearch]);
+
+  // Final filtered leases
+  const filteredLeases = useMemo(() => {
+    if (selectedLeases.length === 0) return preFilteredLeases;
+    return preFilteredLeases.filter(l => selectedLeases.includes(l.lease_id));
+  }, [preFilteredLeases, selectedLeases]);
 
   const getVersionInfo = (lease: Lease) => {
     const modCount = (lease.modifications || []).length;
@@ -314,44 +369,34 @@ export default function Reports() {
         <div className="flex items-center gap-2 mb-3">
           <Filter className="w-4 h-4 text-muted-foreground" />
           <h3 className="text-sm font-semibold">Filters</h3>
+          <Badge variant="secondary" className="text-[10px]">{filteredLeases.length} leases selected</Badge>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-3 mb-3">
+          <MultiSelectFilter
+            label="Corporate Group"
+            options={groups.map(g => ({ value: g.corporate_id, label: g.corporate_group_name }))}
+            selected={selectedGroups}
+            onChange={setSelectedGroups}
+            placeholder="All Groups"
+          />
+          <MultiSelectFilter
+            label="Entity"
+            options={filteredEntityOptions.map(e => ({ value: e.entity_id, label: e.legal_entity_name }))}
+            selected={selectedEntities}
+            onChange={setSelectedEntities}
+            placeholder="All Entities"
+          />
+          <MultiSelectFilter
+            label="Lease Type"
+            options={leaseTypes.map(lt => ({ value: lt, label: lt }))}
+            selected={selectedLeaseTypes}
+            onChange={setSelectedLeaseTypes}
+            placeholder="All Types"
+          />
           <div>
-            <Label className="text-xs">Period From</Label>
-            <Input type="date" value={periodFrom} onChange={e => setPeriodFrom(e.target.value)} className="mt-1" />
-          </div>
-          <div>
-            <Label className="text-xs">Period To</Label>
-            <Input type="date" value={periodTo} onChange={e => setPeriodTo(e.target.value)} className="mt-1" />
-          </div>
-          <div>
-            <Label className="text-xs">Entity</Label>
-            <Select value={entityFilter} onValueChange={setEntityFilter}>
-              <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Entities</SelectItem>
-                {entities.map(e => (
-                  <SelectItem key={e.entity_id} value={e.entity_id}>{e.legal_entity_name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <Label className="text-xs">Lease Type</Label>
-            <Select value={leaseTypeFilter} onValueChange={setLeaseTypeFilter}>
-              <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Types</SelectItem>
-                {leaseTypes.map(lt => (
-                  <SelectItem key={lt} value={lt}>{lt}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <Label className="text-xs">Classification</Label>
+            <Label className="text-xs text-muted-foreground">Classification</Label>
             <Select value={classificationFilter} onValueChange={setClassificationFilter}>
-              <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="mt-1 h-9"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All</SelectItem>
                 <SelectItem value="Finance">Finance</SelectItem>
@@ -359,10 +404,20 @@ export default function Reports() {
               </SelectContent>
             </Select>
           </div>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-3">
           <div>
-            <Label className="text-xs">Report Type</Label>
+            <Label className="text-xs text-muted-foreground">Period From</Label>
+            <Input type="date" value={periodFrom} onChange={e => setPeriodFrom(e.target.value)} className="mt-1 h-9" />
+          </div>
+          <div>
+            <Label className="text-xs text-muted-foreground">Period To</Label>
+            <Input type="date" value={periodTo} onChange={e => setPeriodTo(e.target.value)} className="mt-1 h-9" />
+          </div>
+          <div>
+            <Label className="text-xs text-muted-foreground">Report Type</Label>
             <Select value={reportType} onValueChange={(v: ReportType) => setReportType(v)}>
-              <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="mt-1 h-9"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="summary">Lease Summary</SelectItem>
                 <SelectItem value="version_history">Version History</SelectItem>
@@ -373,6 +428,83 @@ export default function Reports() {
               </SelectContent>
             </Select>
           </div>
+        </div>
+      </div>
+
+      {/* Lease Selector */}
+      <div className="bg-card border rounded-lg p-4 mb-6">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <Search className="w-4 h-4 text-muted-foreground" />
+            <h3 className="text-sm font-semibold">Select Leases</h3>
+            <span className="text-xs text-muted-foreground">
+              ({selectedLeases.length === 0 ? 'All' : selectedLeases.length} of {preFilteredLeases.length})
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            {selectedLeases.length > 0 && (
+              <Button variant="ghost" size="sm" className="text-xs h-7" onClick={() => setSelectedLeases([])}>
+                Clear Selection
+              </Button>
+            )}
+            <Button
+              variant="outline" size="sm" className="text-xs h-7"
+              onClick={() => setSelectedLeases(
+                selectedLeases.length === preFilteredLeases.length ? [] : preFilteredLeases.map(l => l.lease_id)
+              )}
+            >
+              {selectedLeases.length === preFilteredLeases.length ? 'Deselect All' : 'Select All'}
+            </Button>
+          </div>
+        </div>
+        <div className="relative mb-2">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+          <Input
+            placeholder="Search by lease name, ID or entity..."
+            value={leaseSearch}
+            onChange={e => setLeaseSearch(e.target.value)}
+            className="pl-9 h-9"
+          />
+        </div>
+        <div className="max-h-48 overflow-y-auto border rounded-md divide-y">
+          {searchableLeases.length === 0 ? (
+            <div className="p-3 text-center text-sm text-muted-foreground">No leases found</div>
+          ) : (
+            searchableLeases.map(lease => {
+              const isSelected = selectedLeases.length === 0 || selectedLeases.includes(lease.lease_id);
+              return (
+                <label
+                  key={lease.lease_id}
+                  className="flex items-center gap-3 px-3 py-2 text-sm hover:bg-accent cursor-pointer"
+                >
+                  <input
+                    type="checkbox"
+                    checked={isSelected}
+                    onChange={() => {
+                      if (selectedLeases.length === 0) {
+                        // Currently "all" — click means select only this one
+                        setSelectedLeases([lease.lease_id]);
+                      } else if (selectedLeases.includes(lease.lease_id)) {
+                        const next = selectedLeases.filter(id => id !== lease.lease_id);
+                        setSelectedLeases(next);
+                      } else {
+                        const next = [...selectedLeases, lease.lease_id];
+                        setSelectedLeases(next.length === preFilteredLeases.length ? [] : next);
+                      }
+                    }}
+                    className="rounded border-input"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <span className="font-medium">{lease.lease_name}</span>
+                    <span className="text-muted-foreground ml-2 text-xs">{lease.legal_entity_name}</span>
+                  </div>
+                  <Badge variant="outline" className="text-[10px] shrink-0">{lease.lease_type || '—'}</Badge>
+                  <Badge variant={lease.status === 'Active' ? 'default' : 'destructive'} className="text-[10px] shrink-0">{lease.status}</Badge>
+                  <span className="text-[10px] text-muted-foreground font-mono shrink-0">{lease.lease_id.slice(0, 8)}</span>
+                </label>
+              );
+            })
+          )}
         </div>
       </div>
 
