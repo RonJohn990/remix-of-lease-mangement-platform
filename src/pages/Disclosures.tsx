@@ -1,12 +1,15 @@
-import { useEffect, useState } from 'react';
-import { getLeases } from '@/lib/store';
+import { useEffect, useState, useMemo } from 'react';
+import { getLeases, getGroups, getEntities } from '@/lib/store';
+import { supabase } from '@/integrations/supabase/client';
 import { computeDisclosures, formatCurrency } from '@/lib/computations';
-import { DisclosureData, Lease } from '@/lib/types';
+import { DisclosureData, Lease, CorporateGroup, Entity } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Download, FileBarChart, Loader2 } from 'lucide-react';
+import { Download, FileBarChart, Loader2, Filter } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { Label } from '@/components/ui/label';
 import { format } from 'date-fns';
+import MultiSelectFilter from '@/components/MultiSelectFilter';
 
 function DisclosureTable({ title, subtitle, rows }: { title: string; subtitle?: string; rows: { label: string; value: number; bold?: boolean; indent?: boolean }[] }) {
   return (
@@ -29,29 +32,81 @@ function DisclosureTable({ title, subtitle, rows }: { title: string; subtitle?: 
 
 export default function Disclosures() {
   const [leases, setLeases] = useState<Lease[]>([]);
+  const [groups, setGroups] = useState<CorporateGroup[]>([]);
+  const [entities, setEntities] = useState<Entity[]>([]);
+  const [leaseTypes, setLeaseTypes] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Filters — empty array = all selected
+  const [selectedGroups, setSelectedGroups] = useState<string[]>([]);
+  const [selectedEntities, setSelectedEntities] = useState<string[]>([]);
+  const [selectedLeaseTypes, setSelectedLeaseTypes] = useState<string[]>([]);
   const [reportingDate, setReportingDate] = useState(format(new Date(), 'yyyy-MM-dd'));
-  const [disclosure, setDisclosure] = useState<DisclosureData | null>(null);
 
   useEffect(() => {
-    getLeases().then(setLeases).finally(() => setLoading(false));
+    const load = async () => {
+      const [l, g, e, ltRes] = await Promise.all([
+        getLeases(),
+        getGroups(),
+        getEntities(),
+        supabase.from('lease_types').select('lease_type_name').order('created_at'),
+      ]);
+      setLeases(l);
+      setGroups(g);
+      setEntities(e);
+      setLeaseTypes((ltRes.data || []).map((r: any) => r.lease_type_name));
+      setLoading(false);
+    };
+    load();
   }, []);
 
+  // Filter entities based on selected groups
+  const filteredEntityOptions = useMemo(() => {
+    if (selectedGroups.length === 0) return entities;
+    return entities.filter(e => selectedGroups.includes(e.corporate_id));
+  }, [entities, selectedGroups]);
+
+  // Reset entity selection when group changes and selected entities are no longer valid
   useEffect(() => {
-    if (leases.length > 0 && reportingDate) {
-      try {
-        setDisclosure(computeDisclosures(leases, reportingDate));
-      } catch {
-        setDisclosure(null);
+    if (selectedEntities.length > 0) {
+      const validIds = new Set(filteredEntityOptions.map(e => e.entity_id));
+      const valid = selectedEntities.filter(id => validIds.has(id));
+      if (valid.length !== selectedEntities.length) {
+        setSelectedEntities(valid);
       }
     }
-  }, [leases, reportingDate]);
+  }, [filteredEntityOptions, selectedEntities]);
+
+  const filteredLeases = useMemo(() => {
+    return leases.filter(l => {
+      // Group filter
+      if (selectedGroups.length > 0) {
+        const entity = entities.find(e => e.entity_id === l.entity_id);
+        if (!entity || !selectedGroups.includes(entity.corporate_id)) return false;
+      }
+      // Entity filter
+      if (selectedEntities.length > 0 && !selectedEntities.includes(l.entity_id)) return false;
+      // Lease type filter
+      if (selectedLeaseTypes.length > 0 && !selectedLeaseTypes.includes(l.lease_type)) return false;
+      return true;
+    });
+  }, [leases, entities, selectedGroups, selectedEntities, selectedLeaseTypes]);
+
+  const disclosure = useMemo<DisclosureData | null>(() => {
+    if (filteredLeases.length === 0 || !reportingDate) return null;
+    try {
+      return computeDisclosures(filteredLeases, reportingDate);
+    } catch {
+      return null;
+    }
+  }, [filteredLeases, reportingDate]);
 
   const exportDisclosures = () => {
     if (!disclosure) return;
     const lines: string[] = [];
     lines.push('Ind AS 116 / IFRS 16 Disclosure Report');
     lines.push(`Reporting Date: ${reportingDate}`);
+    lines.push(`Leases included: ${filteredLeases.length}`);
     lines.push('');
 
     lines.push('MATURITY ANALYSIS OF LEASE LIABILITIES (Ind AS 116.58)');
@@ -107,29 +162,59 @@ export default function Disclosures() {
           <h1 className="page-title">Ind AS 116 Disclosures</h1>
           <p className="page-subtitle">Schedule III compliant lease disclosures per Ind AS 116 / IFRS 16</p>
         </div>
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2">
-            <label className="text-sm text-muted-foreground whitespace-nowrap">Reporting Date:</label>
+        {disclosure && (
+          <Button size="sm" variant="outline" onClick={exportDisclosures}>
+            <Download className="w-3.5 h-3.5 mr-1.5" /> Export CSV
+          </Button>
+        )}
+      </div>
+
+      {/* Filters */}
+      <div className="bg-card border rounded-lg p-4 mb-6">
+        <div className="flex items-center gap-2 mb-3">
+          <Filter className="w-4 h-4 text-muted-foreground" />
+          <h3 className="text-sm font-semibold">Filters</h3>
+          <Badge variant="secondary" className="text-[10px]">{filteredLeases.length} leases</Badge>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
+          <MultiSelectFilter
+            label="Corporate Group"
+            options={groups.map(g => ({ value: g.corporate_id, label: g.corporate_group_name }))}
+            selected={selectedGroups}
+            onChange={setSelectedGroups}
+            placeholder="All Groups"
+          />
+          <MultiSelectFilter
+            label="Entity"
+            options={filteredEntityOptions.map(e => ({ value: e.entity_id, label: e.legal_entity_name }))}
+            selected={selectedEntities}
+            onChange={setSelectedEntities}
+            placeholder="All Entities"
+          />
+          <MultiSelectFilter
+            label="Lease Type"
+            options={leaseTypes.map(lt => ({ value: lt, label: lt }))}
+            selected={selectedLeaseTypes}
+            onChange={setSelectedLeaseTypes}
+            placeholder="All Types"
+          />
+          <div>
+            <Label className="text-xs text-muted-foreground">Reporting Date</Label>
             <Input
               type="date"
               value={reportingDate}
               onChange={e => setReportingDate(e.target.value)}
-              className="w-40"
+              className="mt-1 h-9"
             />
           </div>
-          {disclosure && (
-            <Button size="sm" variant="outline" onClick={exportDisclosures}>
-              <Download className="w-3.5 h-3.5 mr-1.5" /> Export CSV
-            </Button>
-          )}
         </div>
       </div>
 
-      {leases.length === 0 ? (
+      {filteredLeases.length === 0 ? (
         <div className="bg-card border rounded-lg p-8 text-center">
           <FileBarChart className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
-          <h3 className="text-lg font-semibold mb-1">No leases found</h3>
-          <p className="text-sm text-muted-foreground">Create leases to generate disclosures.</p>
+          <h3 className="text-lg font-semibold mb-1">No leases match filters</h3>
+          <p className="text-sm text-muted-foreground">Adjust your filter selections to generate disclosures.</p>
         </div>
       ) : disclosure ? (
         <div className="space-y-6">
