@@ -399,85 +399,295 @@ export default function Reports() {
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b bg-muted/20">
-                  <th className="px-3 py-2 text-left font-medium">Lease Name</th>
-                  <th className="px-3 py-2 text-left font-medium">Entity</th>
-                  <th className="px-3 py-2 text-left font-medium">Type</th>
-                  <th className="px-3 py-2 text-left font-medium">Classification</th>
-                  <th className="px-3 py-2 text-center font-medium">Version</th>
-                  <th className="px-3 py-2 text-left font-medium">Lease Event</th>
-                  <th className="px-3 py-2 text-center font-medium">Amendments</th>
-                  <th className="px-3 py-2 text-left font-medium">Status</th>
-                  <th className="px-3 py-2 text-right font-medium">Initial Liability</th>
-                  <th className="px-3 py-2 text-right font-medium">Initial ROU</th>
-                  <th className="px-3 py-2 text-right font-medium">Total Interest</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y">
-                {previewData.map(({ lease, comp, error }) => {
-                  const vi = getVersionInfo(lease);
-                  return (
-                  <tr key={lease.lease_id} className="hover:bg-muted/10">
-                    <td className="px-3 py-2 font-medium">{lease.lease_name}</td>
-                    <td className="px-3 py-2 text-muted-foreground">{lease.legal_entity_name}</td>
-                    <td className="px-3 py-2">{lease.lease_type || '—'}</td>
-                    <td className="px-3 py-2">
-                      <Badge variant={lease.lease_classification === 'Finance' ? 'default' : 'secondary'} className="text-[10px]">
-                        {lease.lease_classification}
-                      </Badge>
-                    </td>
-                    <td className="px-3 py-2 text-center">
-                      <Badge variant="outline" className="text-[10px]">v{vi.currentVersion}</Badge>
-                    </td>
-                    <td className="px-3 py-2">
-                      <Badge variant={lease.lease_event === 'TERMINATION' ? 'destructive' : lease.lease_event === 'MODIFICATION' ? 'secondary' : 'outline'} className="text-[10px]">
-                        {lease.lease_event}
-                      </Badge>
-                    </td>
-                    <td className="px-3 py-2 text-center">
-                      {vi.modCount > 0 ? (
-                        <span className="text-xs" title={vi.amendmentDates.join('\n')}>
-                          {vi.modCount} amendment{vi.modCount > 1 ? 's' : ''}
-                        </span>
-                      ) : (
-                        <span className="text-xs text-muted-foreground">—</span>
-                      )}
-                    </td>
-                    <td className="px-3 py-2">
-                      <Badge variant={lease.status === 'Active' ? 'default' : 'destructive'} className="text-[10px]">
-                        {lease.status}
-                      </Badge>
-                    </td>
-                    <td className="px-3 py-2 text-right font-mono tabular-nums">
-                      {error ? '—' : formatCurrency(comp!.initial_liability)}
-                    </td>
-                    <td className="px-3 py-2 text-right font-mono tabular-nums">
-                      {error ? '—' : formatCurrency(comp!.initial_rou)}
-                    </td>
-                    <td className="px-3 py-2 text-right font-mono tabular-nums">
-                      {error ? '—' : formatCurrency(comp!.total_interest)}
-                    </td>
-                  </tr>
-                  );
-                })}
-              </tbody>
-              {!previewData.some(d => d.error) && previewData.length > 1 && (
-                <tfoot>
-                  <tr className="border-t font-semibold bg-muted/20">
-                    <td className="px-3 py-2" colSpan={8}>Total</td>
-                    <td className="px-3 py-2 text-right font-mono tabular-nums">
-                      {formatCurrency(previewData.reduce((s, d) => s + (d.comp?.initial_liability || 0), 0))}
-                    </td>
-                    <td className="px-3 py-2 text-right font-mono tabular-nums">
-                      {formatCurrency(previewData.reduce((s, d) => s + (d.comp?.initial_rou || 0), 0))}
-                    </td>
-                    <td className="px-3 py-2 text-right font-mono tabular-nums">
-                      {formatCurrency(previewData.reduce((s, d) => s + (d.comp?.total_interest || 0), 0))}
-                    </td>
-                  </tr>
-                </tfoot>
+              {reportType === 'summary' && (
+                <>
+                  <thead>
+                    <tr className="border-b bg-muted/20">
+                      <th className="px-3 py-2 text-left font-medium">Lease Name</th>
+                      <th className="px-3 py-2 text-left font-medium">Entity</th>
+                      <th className="px-3 py-2 text-left font-medium">Type</th>
+                      <th className="px-3 py-2 text-left font-medium">Classification</th>
+                      <th className="px-3 py-2 text-center font-medium">Version</th>
+                      <th className="px-3 py-2 text-left font-medium">Lease Event</th>
+                      <th className="px-3 py-2 text-center font-medium">Amendments</th>
+                      <th className="px-3 py-2 text-left font-medium">Status</th>
+                      <th className="px-3 py-2 text-right font-medium">Initial Liability</th>
+                      <th className="px-3 py-2 text-right font-medium">Initial ROU</th>
+                      <th className="px-3 py-2 text-right font-medium">Total Interest</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {previewData.map(({ lease, comp, error }) => {
+                      const vi = getVersionInfo(lease);
+                      return (
+                        <tr key={lease.lease_id} className="hover:bg-muted/10">
+                          <td className="px-3 py-2 font-medium">{lease.lease_name}</td>
+                          <td className="px-3 py-2 text-muted-foreground">{lease.legal_entity_name}</td>
+                          <td className="px-3 py-2">{lease.lease_type || '—'}</td>
+                          <td className="px-3 py-2"><Badge variant={lease.lease_classification === 'Finance' ? 'default' : 'secondary'} className="text-[10px]">{lease.lease_classification}</Badge></td>
+                          <td className="px-3 py-2 text-center"><Badge variant="outline" className="text-[10px]">v{vi.currentVersion}</Badge></td>
+                          <td className="px-3 py-2"><Badge variant={lease.lease_event === 'TERMINATION' ? 'destructive' : lease.lease_event === 'MODIFICATION' ? 'secondary' : 'outline'} className="text-[10px]">{lease.lease_event}</Badge></td>
+                          <td className="px-3 py-2 text-center">{vi.modCount > 0 ? <span className="text-xs" title={vi.amendmentDates.join('\n')}>{vi.modCount} amendment{vi.modCount > 1 ? 's' : ''}</span> : <span className="text-xs text-muted-foreground">—</span>}</td>
+                          <td className="px-3 py-2"><Badge variant={lease.status === 'Active' ? 'default' : 'destructive'} className="text-[10px]">{lease.status}</Badge></td>
+                          <td className="px-3 py-2 text-right font-mono tabular-nums">{error ? '—' : formatCurrency(comp!.initial_liability)}</td>
+                          <td className="px-3 py-2 text-right font-mono tabular-nums">{error ? '—' : formatCurrency(comp!.initial_rou)}</td>
+                          <td className="px-3 py-2 text-right font-mono tabular-nums">{error ? '—' : formatCurrency(comp!.total_interest)}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                  {!previewData.some(d => d.error) && previewData.length > 1 && (
+                    <tfoot>
+                      <tr className="border-t font-semibold bg-muted/20">
+                        <td className="px-3 py-2" colSpan={8}>Total</td>
+                        <td className="px-3 py-2 text-right font-mono tabular-nums">{formatCurrency(previewData.reduce((s, d) => s + (d.comp?.initial_liability || 0), 0))}</td>
+                        <td className="px-3 py-2 text-right font-mono tabular-nums">{formatCurrency(previewData.reduce((s, d) => s + (d.comp?.initial_rou || 0), 0))}</td>
+                        <td className="px-3 py-2 text-right font-mono tabular-nums">{formatCurrency(previewData.reduce((s, d) => s + (d.comp?.total_interest || 0), 0))}</td>
+                      </tr>
+                    </tfoot>
+                  )}
+                </>
               )}
+
+              {reportType === 'version_history' && (
+                <>
+                  <thead>
+                    <tr className="border-b bg-muted/20">
+                      <th className="px-3 py-2 text-left font-medium">Lease Name</th>
+                      <th className="px-3 py-2 text-left font-medium">Entity</th>
+                      <th className="px-3 py-2 text-left font-medium">Classification</th>
+                      <th className="px-3 py-2 text-center font-medium">Version</th>
+                      <th className="px-3 py-2 text-left font-medium">Event</th>
+                      <th className="px-3 py-2 text-left font-medium">Event Date</th>
+                      <th className="px-3 py-2 text-left font-medium">Type</th>
+                      <th className="px-3 py-2 text-left font-medium">Description</th>
+                      <th className="px-3 py-2 text-right font-medium">Gain/Loss</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {filteredLeases.flatMap(lease => {
+                      const rows = [];
+                      rows.push(
+                        <tr key={`${lease.lease_id}-v1`} className="hover:bg-muted/10">
+                          <td className="px-3 py-2 font-medium">{lease.lease_name}</td>
+                          <td className="px-3 py-2 text-muted-foreground">{lease.legal_entity_name}</td>
+                          <td className="px-3 py-2">{lease.lease_classification}</td>
+                          <td className="px-3 py-2 text-center"><Badge variant="outline" className="text-[10px]">v1</Badge></td>
+                          <td className="px-3 py-2"><Badge variant="outline" className="text-[10px]">INITIAL</Badge></td>
+                          <td className="px-3 py-2">{lease.rent_commencement_date}</td>
+                          <td className="px-3 py-2">Initial Recognition</td>
+                          <td className="px-3 py-2 text-muted-foreground">Lease commencement</td>
+                          <td className="px-3 py-2 text-right font-mono tabular-nums">—</td>
+                        </tr>
+                      );
+                      (lease.modifications || []).forEach((mod, i) => {
+                        rows.push(
+                          <tr key={`${lease.lease_id}-v${i + 2}`} className="hover:bg-muted/10">
+                            <td className="px-3 py-2 font-medium">{lease.lease_name}</td>
+                            <td className="px-3 py-2 text-muted-foreground">{lease.legal_entity_name}</td>
+                            <td className="px-3 py-2">{lease.lease_classification}</td>
+                            <td className="px-3 py-2 text-center"><Badge variant="outline" className="text-[10px]">v{i + 2}</Badge></td>
+                            <td className="px-3 py-2"><Badge variant="secondary" className="text-[10px]">{mod.modification_type}</Badge></td>
+                            <td className="px-3 py-2">{mod.effective_date}</td>
+                            <td className="px-3 py-2">{mod.modification_type.replace(/_/g, ' ')}</td>
+                            <td className="px-3 py-2 text-muted-foreground">{mod.description || '—'}</td>
+                            <td className="px-3 py-2 text-right font-mono tabular-nums">{mod.gain_loss ? formatCurrency(mod.gain_loss) : '—'}</td>
+                          </tr>
+                        );
+                      });
+                      return rows;
+                    })}
+                  </tbody>
+                </>
+              )}
+
+              {reportType === 'schedule' && (() => {
+                const scheduleRows = filteredLeases.flatMap(lease => {
+                  try {
+                    const comp = computeLease(lease);
+                    return comp.schedule
+                      .filter(row => {
+                        if (periodFrom && isBefore(parseISO(row.period_date), parseISO(periodFrom))) return false;
+                        if (periodTo && isAfter(parseISO(row.period_date), parseISO(periodTo))) return false;
+                        return true;
+                      })
+                      .map(row => ({ lease, row }));
+                  } catch { return []; }
+                });
+                return (
+                  <>
+                    <thead>
+                      <tr className="border-b bg-muted/20">
+                        <th className="px-3 py-2 text-left font-medium">Lease Name</th>
+                        <th className="px-3 py-2 text-center font-medium">Period</th>
+                        <th className="px-3 py-2 text-left font-medium">Date</th>
+                        <th className="px-3 py-2 text-right font-medium">Payment</th>
+                        <th className="px-3 py-2 text-right font-medium">Opening Liability</th>
+                        <th className="px-3 py-2 text-right font-medium">Interest</th>
+                        <th className="px-3 py-2 text-right font-medium">Closing Liability</th>
+                        <th className="px-3 py-2 text-right font-medium">Opening ROU</th>
+                        <th className="px-3 py-2 text-right font-medium">Depreciation</th>
+                        <th className="px-3 py-2 text-right font-medium">Closing ROU</th>
+                        <th className="px-3 py-2 text-right font-medium">Current</th>
+                        <th className="px-3 py-2 text-right font-medium">Non-Current</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y">
+                      {scheduleRows.map(({ lease, row }, i) => (
+                        <tr key={`${lease.lease_id}-${row.period}-${i}`} className="hover:bg-muted/10">
+                          <td className="px-3 py-2 font-medium">{lease.lease_name}</td>
+                          <td className="px-3 py-2 text-center">{row.period}</td>
+                          <td className="px-3 py-2">{row.period_date}</td>
+                          <td className="px-3 py-2 text-right font-mono tabular-nums">{formatCurrency(row.lease_payment)}</td>
+                          <td className="px-3 py-2 text-right font-mono tabular-nums">{formatCurrency(row.opening_liability)}</td>
+                          <td className="px-3 py-2 text-right font-mono tabular-nums">{formatCurrency(row.interest_expense)}</td>
+                          <td className="px-3 py-2 text-right font-mono tabular-nums">{formatCurrency(row.closing_liability)}</td>
+                          <td className="px-3 py-2 text-right font-mono tabular-nums">{formatCurrency(row.opening_rou)}</td>
+                          <td className="px-3 py-2 text-right font-mono tabular-nums">{formatCurrency(row.depreciation)}</td>
+                          <td className="px-3 py-2 text-right font-mono tabular-nums">{formatCurrency(row.closing_rou)}</td>
+                          <td className="px-3 py-2 text-right font-mono tabular-nums">{formatCurrency(row.current_liability)}</td>
+                          <td className="px-3 py-2 text-right font-mono tabular-nums">{formatCurrency(row.non_current_liability)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </>
+                );
+              })()}
+
+              {reportType === 'payment_schedule' && (() => {
+                const paymentRows = filteredLeases.flatMap(lease => {
+                  try {
+                    const comp = computeLease(lease);
+                    let cumulative = 0;
+                    return comp.schedule
+                      .filter(row => {
+                        if (periodFrom && isBefore(parseISO(row.period_date), parseISO(periodFrom))) return false;
+                        if (periodTo && isAfter(parseISO(row.period_date), parseISO(periodTo))) return false;
+                        return true;
+                      })
+                      .map(row => {
+                        cumulative += row.lease_payment;
+                        const hasEscalation = (lease.escalations || []).some(e => !isAfter(parseISO(e.escalation_start_date), parseISO(row.period_date)));
+                        return { lease, row, cumulative: round2(cumulative), hasEscalation };
+                      });
+                  } catch { return []; }
+                });
+                return (
+                  <>
+                    <thead>
+                      <tr className="border-b bg-muted/20">
+                        <th className="px-3 py-2 text-left font-medium">Lease Name</th>
+                        <th className="px-3 py-2 text-left font-medium">Entity</th>
+                        <th className="px-3 py-2 text-center font-medium">Period</th>
+                        <th className="px-3 py-2 text-left font-medium">Date</th>
+                        <th className="px-3 py-2 text-center font-medium">Days</th>
+                        <th className="px-3 py-2 text-right font-medium">Payment</th>
+                        <th className="px-3 py-2 text-left font-medium">Frequency</th>
+                        <th className="px-3 py-2 text-center font-medium">Escalation</th>
+                        <th className="px-3 py-2 text-right font-medium">Cumulative</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y">
+                      {paymentRows.map(({ lease, row, cumulative, hasEscalation }, i) => (
+                        <tr key={`${lease.lease_id}-${row.period}-${i}`} className="hover:bg-muted/10">
+                          <td className="px-3 py-2 font-medium">{lease.lease_name}</td>
+                          <td className="px-3 py-2 text-muted-foreground">{lease.legal_entity_name}</td>
+                          <td className="px-3 py-2 text-center">{row.period}</td>
+                          <td className="px-3 py-2">{row.period_date}</td>
+                          <td className="px-3 py-2 text-center">{row.days_in_period}</td>
+                          <td className="px-3 py-2 text-right font-mono tabular-nums">{formatCurrency(row.lease_payment)}</td>
+                          <td className="px-3 py-2">{lease.payment_frequency}</td>
+                          <td className="px-3 py-2 text-center">{hasEscalation ? <Badge variant="secondary" className="text-[10px]">Yes</Badge> : '—'}</td>
+                          <td className="px-3 py-2 text-right font-mono tabular-nums">{formatCurrency(cumulative)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </>
+                );
+              })()}
+
+              {reportType === 'present_value' && (
+                <>
+                  <thead>
+                    <tr className="border-b bg-muted/20">
+                      <th className="px-3 py-2 text-left font-medium">Lease Name</th>
+                      <th className="px-3 py-2 text-left font-medium">Entity</th>
+                      <th className="px-3 py-2 text-left font-medium">Classification</th>
+                      <th className="px-3 py-2 text-left font-medium">Start</th>
+                      <th className="px-3 py-2 text-left font-medium">End</th>
+                      <th className="px-3 py-2 text-right font-medium">Monthly Amt</th>
+                      <th className="px-3 py-2 text-right font-medium">Rate %</th>
+                      <th className="px-3 py-2 text-right font-medium">Total Undiscounted</th>
+                      <th className="px-3 py-2 text-right font-medium">Initial PV</th>
+                      <th className="px-3 py-2 text-right font-medium">PV %</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {previewData.map(({ lease, comp, error }) => {
+                      const totalPayments = comp ? comp.schedule.reduce((s, r) => s + r.lease_payment, 0) : 0;
+                      const pvPct = totalPayments > 0 && comp ? round2((comp.initial_liability / totalPayments) * 100) : 0;
+                      return (
+                        <tr key={lease.lease_id} className="hover:bg-muted/10">
+                          <td className="px-3 py-2 font-medium">{lease.lease_name}</td>
+                          <td className="px-3 py-2 text-muted-foreground">{lease.legal_entity_name}</td>
+                          <td className="px-3 py-2">{lease.lease_classification}</td>
+                          <td className="px-3 py-2">{lease.lease_start_date}</td>
+                          <td className="px-3 py-2">{lease.lease_end_date}</td>
+                          <td className="px-3 py-2 text-right font-mono tabular-nums">{formatCurrency(lease.monthly_lease_amount)}</td>
+                          <td className="px-3 py-2 text-right font-mono tabular-nums">{lease.discount_rate_ibr}%</td>
+                          <td className="px-3 py-2 text-right font-mono tabular-nums">{error ? '—' : formatCurrency(round2(totalPayments))}</td>
+                          <td className="px-3 py-2 text-right font-mono tabular-nums">{error ? '—' : formatCurrency(comp!.initial_liability)}</td>
+                          <td className="px-3 py-2 text-right font-mono tabular-nums">{error ? '—' : `${pvPct}%`}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </>
+              )}
+
+              {reportType === 'journal' && (() => {
+                const journalRows = filteredLeases.flatMap(lease => {
+                  try {
+                    const comp = computeLease(lease);
+                    const entries = generateJournalEntries(lease, comp);
+                    return entries
+                      .filter(entry => {
+                        if (periodFrom && isBefore(parseISO(entry.date), parseISO(periodFrom))) return false;
+                        if (periodTo && isAfter(parseISO(entry.date), parseISO(periodTo))) return false;
+                        return true;
+                      })
+                      .map(entry => ({ lease, entry }));
+                  } catch { return []; }
+                });
+                return (
+                  <>
+                    <thead>
+                      <tr className="border-b bg-muted/20">
+                        <th className="px-3 py-2 text-left font-medium">Lease Name</th>
+                        <th className="px-3 py-2 text-left font-medium">Date</th>
+                        <th className="px-3 py-2 text-left font-medium">Description</th>
+                        <th className="px-3 py-2 text-left font-medium">Debit Account</th>
+                        <th className="px-3 py-2 text-left font-medium">Credit Account</th>
+                        <th className="px-3 py-2 text-right font-medium">Amount</th>
+                        <th className="px-3 py-2 text-left font-medium">Cash Flow</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y">
+                      {journalRows.map(({ lease, entry }, i) => (
+                        <tr key={`${lease.lease_id}-j-${i}`} className="hover:bg-muted/10">
+                          <td className="px-3 py-2 font-medium">{lease.lease_name}</td>
+                          <td className="px-3 py-2">{entry.date}</td>
+                          <td className="px-3 py-2 text-muted-foreground">{entry.description}</td>
+                          <td className="px-3 py-2">{entry.debit_account}</td>
+                          <td className="px-3 py-2">{entry.credit_account}</td>
+                          <td className="px-3 py-2 text-right font-mono tabular-nums">{formatCurrency(entry.amount)}</td>
+                          <td className="px-3 py-2"><Badge variant="outline" className="text-[10px]">{entry.cash_flow_classification || '—'}</Badge></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </>
+                );
+              })()}
             </table>
           </div>
         )}
