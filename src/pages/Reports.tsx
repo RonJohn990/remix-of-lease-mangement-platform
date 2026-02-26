@@ -1,8 +1,8 @@
 import { useEffect, useState, useMemo } from 'react';
 import { getLeases, getEntities, getGroups } from '@/lib/store';
-import { computeLease, generateJournalEntries, formatCurrency } from '@/lib/computations';
-import { Lease, Entity, CorporateGroup, LeaseComputation } from '@/lib/types';
-import { supabase } from '@/integrations/supabase/client';
+import { formatCurrency } from '@/lib/computations';
+import { api } from '@/lib/api';
+import { Lease, Entity, CorporateGroup, LeaseComputation, JournalEntry } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -22,6 +22,8 @@ export default function Reports() {
   const [groups, setGroups] = useState<CorporateGroup[]>([]);
   const [leaseTypes, setLeaseTypes] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
+  const [computations, setComputations] = useState<Record<string, { computation: LeaseComputation; journals: JournalEntry[] }>>({});
+  const [computing, setComputing] = useState(false);
 
   // Filters
   const [periodFrom, setPeriodFrom] = useState('');
@@ -40,12 +42,12 @@ export default function Reports() {
         getLeases(),
         getEntities(),
         getGroups(),
-        supabase.from('lease_types').select('lease_type_name').order('created_at'),
+        api.get<{ id: string; lease_type_name: string }[]>('/lease-types'),
       ]);
       setLeases(l);
       setEntities(e);
       setGroups(g);
-      setLeaseTypes((ltRes.data || []).map((r: any) => r.lease_type_name));
+      setLeaseTypes(ltRes.map((r) => r.lease_type_name));
       setLoading(false);
     };
     load();
@@ -108,6 +110,31 @@ export default function Reports() {
     return preFilteredLeases.filter(l => selectedLeases.includes(l.lease_id));
   }, [preFilteredLeases, selectedLeases]);
 
+  // Fetch computations for filtered leases
+  const fetchComputations = async (leasesToCompute: Lease[]) => {
+    if (leasesToCompute.length === 0) return {};
+    try {
+      setComputing(true);
+      const result = await api.post<Record<string, { computation: LeaseComputation; journals: JournalEntry[]; error?: string }>>('/compute/batch', { leases: leasesToCompute });
+      setComputations(result);
+      return result;
+    } catch {
+      return {};
+    } finally {
+      setComputing(false);
+    }
+  };
+
+  // Recompute when filtered leases change
+  useEffect(() => {
+    if (!loading && filteredLeases.length > 0) {
+      fetchComputations(filteredLeases);
+    } else {
+      setComputations({});
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filteredLeases, loading]);
+
   const getVersionInfo = (lease: Lease) => {
     const modCount = (lease.modifications || []).length;
     const currentVersion = lease.lease_version || 1;
@@ -117,8 +144,14 @@ export default function Reports() {
     return { currentVersion, modCount, amendmentDates };
   };
 
-  const exportReport = () => {
+  const exportReport = async () => {
     if (filteredLeases.length === 0) return;
+
+    // Ensure computations are available
+    let comps = computations;
+    if (Object.keys(comps).length === 0) {
+      comps = await fetchComputations(filteredLeases) as typeof computations;
+    }
 
     const lines: string[] = [];
     const periodLabel = periodFrom || periodTo
@@ -133,8 +166,9 @@ export default function Reports() {
 
       for (const lease of filteredLeases) {
         const vi = getVersionInfo(lease);
-        try {
-          const comp = computeLease(lease);
+        const compData = comps[lease.lease_id];
+        const comp = compData?.computation;
+        if (comp) {
           lines.push([
             `"${lease.lease_name}"`,
             `"${lease.legal_entity_name}"`,
@@ -154,7 +188,7 @@ export default function Reports() {
             comp.total_interest,
             comp.total_depreciation,
           ].join(','));
-        } catch {
+        } else {
           lines.push([`"${lease.lease_name}"`, `"${lease.legal_entity_name}"`, lease.lease_type, lease.lease_classification, lease.status, vi.currentVersion, lease.lease_event, vi.modCount, `"${vi.amendmentDates.join('; ')}"`, lease.lease_start_date, lease.lease_end_date, lease.monthly_lease_amount, lease.discount_rate_ibr, 'Error', '', '', ''].join(','));
         }
       }
@@ -210,28 +244,27 @@ export default function Reports() {
       lines.push('Lease Name,Entity,Classification,Period,Date,Days,Payment Amount,Payment Frequency,Escalation Applied,Cumulative Payments');
 
       for (const lease of filteredLeases) {
-        try {
-          const comp = computeLease(lease);
-          let cumulative = 0;
-          for (const row of comp.schedule) {
-            if (periodFrom && isBefore(parseISO(row.period_date), parseISO(periodFrom))) continue;
-            if (periodTo && isAfter(parseISO(row.period_date), parseISO(periodTo))) continue;
-            cumulative += row.lease_payment;
-            const hasEscalation = (lease.escalations || []).some(e => !isAfter(parseISO(e.escalation_start_date), parseISO(row.period_date)));
-            lines.push([
-              `"${lease.lease_name}"`,
-              `"${lease.legal_entity_name}"`,
-              lease.lease_classification,
-              row.period,
-              row.period_date,
-              row.days_in_period,
-              row.lease_payment,
-              lease.payment_frequency,
-              hasEscalation ? 'Yes' : 'No',
-              round2(cumulative),
-            ].join(','));
-          }
-        } catch { /* skip */ }
+        const comp = comps[lease.lease_id]?.computation;
+        if (!comp) continue;
+        let cumulative = 0;
+        for (const row of comp.schedule) {
+          if (periodFrom && isBefore(parseISO(row.period_date), parseISO(periodFrom))) continue;
+          if (periodTo && isAfter(parseISO(row.period_date), parseISO(periodTo))) continue;
+          cumulative += row.lease_payment;
+          const hasEscalation = (lease.escalations || []).some(e => !isAfter(parseISO(e.escalation_start_date), parseISO(row.period_date)));
+          lines.push([
+            `"${lease.lease_name}"`,
+            `"${lease.legal_entity_name}"`,
+            lease.lease_classification,
+            row.period,
+            row.period_date,
+            row.days_in_period,
+            row.lease_payment,
+            lease.payment_frequency,
+            hasEscalation ? 'Yes' : 'No',
+            round2(cumulative),
+          ].join(','));
+        }
       }
     } else if (reportType === 'present_value') {
       lines.push('Present Value of Leases Report');
@@ -240,8 +273,8 @@ export default function Reports() {
       lines.push('Lease Name,Entity,Classification,Start Date,End Date,Monthly Amount,Discount Rate (%),Total Undiscounted Payments,Initial PV (Liability),Initial ROU Asset,Total Interest Over Term,Total Depreciation Over Term,Net Carrying Liability (Final),PV as % of Undiscounted');
 
       for (const lease of filteredLeases) {
-        try {
-          const comp = computeLease(lease);
+        const comp = comps[lease.lease_id]?.computation;
+        if (comp) {
           const totalPayments = comp.schedule.reduce((s, r) => s + r.lease_payment, 0);
           const finalLiab = comp.schedule.length > 0 ? comp.schedule[comp.schedule.length - 1].closing_liability : 0;
           const pvPct = totalPayments > 0 ? round2((comp.initial_liability / totalPayments) * 100) : 0;
@@ -261,7 +294,7 @@ export default function Reports() {
             round2(finalLiab),
             pvPct,
           ].join(','));
-        } catch {
+        } else {
           lines.push([`"${lease.lease_name}"`, `"${lease.legal_entity_name}"`, lease.lease_classification, lease.lease_start_date, lease.lease_end_date, lease.monthly_lease_amount, lease.discount_rate_ibr, 'Error', '', '', '', '', '', ''].join(','));
         }
       }
@@ -272,31 +305,30 @@ export default function Reports() {
       lines.push('Lease Name,Entity,Classification,Version,Period,Date,Days,Payment,Opening Liability,Interest,Closing Liability,Opening ROU,Depreciation,Closing ROU,Current Liability,Non-Current Liability');
 
       for (const lease of filteredLeases) {
-        try {
-          const comp = computeLease(lease);
-          for (const row of comp.schedule) {
-            if (periodFrom && isBefore(parseISO(row.period_date), parseISO(periodFrom))) continue;
-            if (periodTo && isAfter(parseISO(row.period_date), parseISO(periodTo))) continue;
-            lines.push([
-              `"${lease.lease_name}"`,
-              `"${lease.legal_entity_name}"`,
-              lease.lease_classification,
-              lease.lease_version,
-              row.period,
-              row.period_date,
-              row.days_in_period,
-              row.lease_payment,
-              row.opening_liability,
-              row.interest_expense,
-              row.closing_liability,
-              row.opening_rou,
-              row.depreciation,
-              row.closing_rou,
-              row.current_liability,
-              row.non_current_liability,
-            ].join(','));
-          }
-        } catch { /* skip */ }
+        const comp = comps[lease.lease_id]?.computation;
+        if (!comp) continue;
+        for (const row of comp.schedule) {
+          if (periodFrom && isBefore(parseISO(row.period_date), parseISO(periodFrom))) continue;
+          if (periodTo && isAfter(parseISO(row.period_date), parseISO(periodTo))) continue;
+          lines.push([
+            `"${lease.lease_name}"`,
+            `"${lease.legal_entity_name}"`,
+            lease.lease_classification,
+            lease.lease_version,
+            row.period,
+            row.period_date,
+            row.days_in_period,
+            row.lease_payment,
+            row.opening_liability,
+            row.interest_expense,
+            row.closing_liability,
+            row.opening_rou,
+            row.depreciation,
+            row.closing_rou,
+            row.current_liability,
+            row.non_current_liability,
+          ].join(','));
+        }
       }
     } else if (reportType === 'journal') {
       lines.push('Journal Entries Report');
@@ -305,26 +337,23 @@ export default function Reports() {
       lines.push('Lease Name,Entity,Classification,Version,Date,Description,Debit Account,Credit Account,Amount,Cash Flow Classification');
 
       for (const lease of filteredLeases) {
-        try {
-          const comp = computeLease(lease);
-          const entries = generateJournalEntries(lease, comp);
-          for (const entry of entries) {
-            if (periodFrom && isBefore(parseISO(entry.date), parseISO(periodFrom))) continue;
-            if (periodTo && isAfter(parseISO(entry.date), parseISO(periodTo))) continue;
-            lines.push([
-              `"${lease.lease_name}"`,
-              `"${lease.legal_entity_name}"`,
-              lease.lease_classification,
-              lease.lease_version,
-              entry.date,
-              `"${entry.description}"`,
-              entry.debit_account,
-              entry.credit_account,
-              entry.amount,
-              entry.cash_flow_classification || '',
-            ].join(','));
-          }
-        } catch { /* skip */ }
+        const entries = comps[lease.lease_id]?.journals || [];
+        for (const entry of entries) {
+          if (periodFrom && isBefore(parseISO(entry.date), parseISO(periodFrom))) continue;
+          if (periodTo && isAfter(parseISO(entry.date), parseISO(periodTo))) continue;
+          lines.push([
+            `"${lease.lease_name}"`,
+            `"${lease.legal_entity_name}"`,
+            lease.lease_classification,
+            lease.lease_version,
+            entry.date,
+            `"${entry.description}"`,
+            entry.debit_account,
+            entry.credit_account,
+            entry.amount,
+            entry.cash_flow_classification || '',
+          ].join(','));
+        }
       }
     }
 
@@ -339,14 +368,10 @@ export default function Reports() {
     URL.revokeObjectURL(url);
   };
 
-  // Preview computations for table
+  // Preview data for table using pre-computed results
   const previewData = filteredLeases.map(lease => {
-    try {
-      const comp = computeLease(lease);
-      return { lease, comp, error: false };
-    } catch {
-      return { lease, comp: null as LeaseComputation | null, error: true };
-    }
+    const compData = computations[lease.lease_id];
+    return { lease, comp: compData?.computation ?? null, error: !compData || !!compData.error };
   });
 
   if (loading) return (
@@ -517,8 +542,8 @@ export default function Reports() {
             </h3>
             <Badge variant="secondary" className="text-[10px]">{filteredLeases.length} leases</Badge>
           </div>
-          <Button size="sm" onClick={exportReport} disabled={filteredLeases.length === 0}>
-            <Download className="w-3.5 h-3.5 mr-1.5" /> Download CSV
+          <Button size="sm" onClick={exportReport} disabled={filteredLeases.length === 0 || computing}>
+            {computing ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <Download className="w-3.5 h-3.5 mr-1.5" />} Download CSV
           </Button>
         </div>
 
@@ -635,16 +660,15 @@ export default function Reports() {
 
               {reportType === 'schedule' && (() => {
                 const scheduleRows = filteredLeases.flatMap(lease => {
-                  try {
-                    const comp = computeLease(lease);
-                    return comp.schedule
-                      .filter(row => {
-                        if (periodFrom && isBefore(parseISO(row.period_date), parseISO(periodFrom))) return false;
-                        if (periodTo && isAfter(parseISO(row.period_date), parseISO(periodTo))) return false;
-                        return true;
-                      })
-                      .map(row => ({ lease, row }));
-                  } catch { return []; }
+                  const comp = computations[lease.lease_id]?.computation;
+                  if (!comp) return [];
+                  return comp.schedule
+                    .filter(row => {
+                      if (periodFrom && isBefore(parseISO(row.period_date), parseISO(periodFrom))) return false;
+                      if (periodTo && isAfter(parseISO(row.period_date), parseISO(periodTo))) return false;
+                      return true;
+                    })
+                    .map(row => ({ lease, row }));
                 });
                 return (
                   <>
@@ -688,21 +712,20 @@ export default function Reports() {
 
               {reportType === 'payment_schedule' && (() => {
                 const paymentRows = filteredLeases.flatMap(lease => {
-                  try {
-                    const comp = computeLease(lease);
-                    let cumulative = 0;
-                    return comp.schedule
-                      .filter(row => {
-                        if (periodFrom && isBefore(parseISO(row.period_date), parseISO(periodFrom))) return false;
-                        if (periodTo && isAfter(parseISO(row.period_date), parseISO(periodTo))) return false;
-                        return true;
-                      })
-                      .map(row => {
-                        cumulative += row.lease_payment;
-                        const hasEscalation = (lease.escalations || []).some(e => !isAfter(parseISO(e.escalation_start_date), parseISO(row.period_date)));
-                        return { lease, row, cumulative: round2(cumulative), hasEscalation };
-                      });
-                  } catch { return []; }
+                  const comp = computations[lease.lease_id]?.computation;
+                  if (!comp) return [];
+                  let cumulative = 0;
+                  return comp.schedule
+                    .filter(row => {
+                      if (periodFrom && isBefore(parseISO(row.period_date), parseISO(periodFrom))) return false;
+                      if (periodTo && isAfter(parseISO(row.period_date), parseISO(periodTo))) return false;
+                      return true;
+                    })
+                    .map(row => {
+                      cumulative += row.lease_payment;
+                      const hasEscalation = (lease.escalations || []).some(e => !isAfter(parseISO(e.escalation_start_date), parseISO(row.period_date)));
+                      return { lease, row, cumulative: round2(cumulative), hasEscalation };
+                    });
                 });
                 return (
                   <>
@@ -779,17 +802,14 @@ export default function Reports() {
 
               {reportType === 'journal' && (() => {
                 const journalRows = filteredLeases.flatMap(lease => {
-                  try {
-                    const comp = computeLease(lease);
-                    const entries = generateJournalEntries(lease, comp);
-                    return entries
-                      .filter(entry => {
-                        if (periodFrom && isBefore(parseISO(entry.date), parseISO(periodFrom))) return false;
-                        if (periodTo && isAfter(parseISO(entry.date), parseISO(periodTo))) return false;
-                        return true;
-                      })
-                      .map(entry => ({ lease, entry }));
-                  } catch { return []; }
+                  const entries = computations[lease.lease_id]?.journals || [];
+                  return entries
+                    .filter(entry => {
+                      if (periodFrom && isBefore(parseISO(entry.date), parseISO(periodFrom))) return false;
+                      if (periodTo && isAfter(parseISO(entry.date), parseISO(periodTo))) return false;
+                      return true;
+                    })
+                    .map(entry => ({ lease, entry }));
                 });
                 return (
                   <>

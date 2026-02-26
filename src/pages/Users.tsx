@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { api } from '@/lib/api';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -53,32 +53,25 @@ export default function Users() {
   const [roleEditUserId, setRoleEditUserId] = useState('');
   const [roleEditValue, setRoleEditValue] = useState<string>('viewer');
   const reload = async () => {
-    const [profilesRes, rolesRes, groupsData, entitiesData, assignRes] = await Promise.all([
-      supabase.from('profiles').select('*'),
-      supabase.from('user_roles').select('*'),
+    const [profiles, rolesData, groupsData, entitiesData, assignData] = await Promise.all([
+      api.get<{ user_id: string; full_name: string; email: string }[]>('/profiles'),
+      api.get<{ user_id: string; role: string }[]>('/users/roles'),
       getGroups(),
       getEntities(),
-      supabase.from('user_entity_assignments').select('*'),
+      api.get<Assignment[]>('/assignments'),
     ]);
 
-    const profiles = profilesRes.data || [];
-    const roles = rolesRes.data || [];
-    const merged: UserProfile[] = profiles.map((p: any) => ({
+    const merged: UserProfile[] = profiles.map((p) => ({
       user_id: p.user_id,
       full_name: p.full_name,
       email: p.email,
-      roles: roles.filter((r: any) => r.user_id === p.user_id).map((r: any) => r.role),
+      roles: rolesData.filter((r) => r.user_id === p.user_id).map((r) => r.role),
     }));
 
     setUsers(merged);
     setGroups(groupsData);
     setEntities(entitiesData);
-    setAssignments((assignRes.data || []).map((a: any) => ({
-      id: a.id,
-      user_id: a.user_id,
-      corporate_id: a.corporate_id,
-      entity_id: a.entity_id,
-    })));
+    setAssignments(assignData);
   };
 
   useEffect(() => { reload().finally(() => setLoading(false)); }, []);
@@ -90,12 +83,7 @@ export default function Users() {
     }
     setSaving(true);
     try {
-      // Use edge function to create user (admin-only)
-      const { data, error } = await supabase.functions.invoke('admin-create-user', {
-        body: { email: newEmail, password: newPassword, full_name: newName, role: newRole },
-      });
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
+      await api.post('/users', { email: newEmail, password: newPassword, full_name: newName, role: newRole });
       setShowNewUser(false);
       setNewEmail('');
       setNewName('');
@@ -117,12 +105,11 @@ export default function Users() {
     }
     setSaving(true);
     try {
-      const { error } = await supabase.from('user_entity_assignments').insert({
+      await api.post('/assignments', {
         user_id: assignUserId,
         corporate_id: assignGroupId,
         entity_id: assignEntityId || null,
       });
-      if (error) throw error;
       setShowAssign(false);
       setAssignUserId('');
       setAssignGroupId('');
@@ -138,7 +125,7 @@ export default function Users() {
 
   const handleRemoveAssignment = async (id: string) => {
     try {
-      await supabase.from('user_entity_assignments').delete().eq('id', id);
+      await api.delete(`/assignments/${id}`);
       await reload();
       toast.success('Assignment removed');
     } catch (e: any) {
@@ -155,11 +142,7 @@ export default function Users() {
   const handleRoleChange = async () => {
     setSaving(true);
     try {
-      // Delete existing roles for user
-      await supabase.from('user_roles').delete().eq('user_id', roleEditUserId);
-      // Insert new role
-      const { error } = await supabase.from('user_roles').insert({ user_id: roleEditUserId, role: roleEditValue as any });
-      if (error) throw error;
+      await api.put(`/users/${roleEditUserId}/role`, { role: roleEditValue });
       setShowRoleEdit(false);
       await reload();
       toast.success('Role updated');

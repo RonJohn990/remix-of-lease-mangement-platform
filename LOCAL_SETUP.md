@@ -1,253 +1,151 @@
-# Local Installation Guide – EasyLease (Windows 11)
+# Local Setup Guide
 
-This guide will help you run the entire application (frontend + database) locally on your Windows 11 machine without any internet dependency after initial setup.
-
----
+This app has a **Python/Flask backend** and a **React frontend**. Both must be running for the app to work.
 
 ## Prerequisites
 
-### 1. Install Node.js (v18 or higher)
-
-- Download from: https://nodejs.org/ (choose **LTS** version)
-- Run the installer, accept defaults
-- Verify installation:
-  ```powershell
-  node --version
-  npm --version
-  ```
-
-### 2. Install Git
-
-- Download from: https://git-scm.com/download/win
-- Run the installer, accept defaults
-- Verify installation:
-  ```powershell
-  git --version
-  ```
-
-### 3. Install Docker Desktop
-
-- Download from: https://www.docker.com/products/docker-desktop/
-- Run the installer
-- **Important:** During installation, ensure **WSL 2** backend is selected (recommended)
-- Restart your computer if prompted
-- Open Docker Desktop and wait for it to fully start (whale icon in system tray should be stable)
-- Verify installation:
-  ```powershell
-  docker --version
-  docker compose version
-  ```
-
-### 4. Install Supabase CLI
-
-```powershell
-npm install -g supabase
-```
-
-Verify installation:
-```powershell
-supabase --version
-```
+- Node.js ≥ 18
+- Python ≥ 3.10
+- npm (or equivalent)
 
 ---
 
-## Installation Steps
+## 1. Install Frontend Dependencies
 
-### Step 1: Clone the Repository
-
-```powershell
-git clone <YOUR_GIT_URL>
-cd <YOUR_PROJECT_NAME>
-```
-
-### Step 2: Start Local Supabase
-
-Make sure **Docker Desktop is running**, then:
-
-```powershell
-supabase start
-```
-
-> ⏳ The first run will download Docker images (~2-5 minutes depending on your internet speed). After this, no internet is needed.
-
-Once complete, the CLI will display output like this:
-
-```
-         API URL: http://127.0.0.1:54321
-     GraphQL URL: http://127.0.0.1:54321/graphql/v1
-  S3 Storage URL: http://127.0.0.1:54321/storage/v1/s3
-          DB URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
-      Studio URL: http://127.0.0.1:54323
-        Inbucket URL: http://127.0.0.1:54324
-          anon key: eyJhb....<long_string>
-  service_role key: eyJhb....<long_string>
-```
-
-**Save the `API URL` and `anon key` values** — you'll need them in the next step.
-
-### Step 3: Configure Environment Variables
-
-The repository ships with a `.env.example` template. **You must create your own `.env` file — do not skip this step.** Using the wrong values here is the most common reason the admin-creation screen never appears.
-
-```powershell
-copy .env.example .env
-```
-
-Open the new `.env` file and set the two values using the output from Step 2:
-
-```env
-VITE_SUPABASE_URL=http://127.0.0.1:54321
-VITE_SUPABASE_PUBLISHABLE_KEY=<paste_your_local_anon_key_here>
-```
-
-> ⚠️ **Do not use the cloud URL** (e.g. `https://uimvfdvfubyzmhvvlwci.supabase.co`). That URL points to a shared database that already has admin users, which will prevent the first-time setup screen from appearing.
-
-### Step 4: Apply Database Migrations
-
-This creates all the tables (corporate_groups, entities, leases, user_roles):
-
-```powershell
-supabase db reset
-```
-
-You should see output confirming migrations were applied successfully.
-
-### Step 5: Install Dependencies
-
-```powershell
+```bash
 npm install
 ```
 
-### Step 6: Serve Edge Functions
+---
 
-The app relies on Supabase Edge Functions (e.g. `bootstrap-admin`). Open a **second PowerShell window** in the project directory and run:
+## 2. Install Backend Dependencies
 
-```powershell
-supabase functions serve
+```bash
+pip3 install -r backend/requirements.txt
 ```
 
-Leave this window open while you use the app. Without this step the admin-creation screen will not appear.
+---
 
-### Step 7: Start the Application
+## 3. Configure the Backend (optional)
 
-Back in your first PowerShell window:
+Copy the example env file and edit as needed:
 
-```powershell
+```bash
+cp backend/.env.example backend/.env
+```
+
+Key variables:
+
+| Variable | Default | Description |
+|---|---|---|
+| `JWT_SECRET_KEY` | `change-me-in-production` | Secret for signing JWT tokens (change in prod!) |
+| `DATABASE_URL` | `sqlite:///lease_management.db` | SQLite file path |
+| `FLASK_PORT` | `5000` | Flask port |
+| `FLASK_DEBUG` | `true` | Debug mode |
+| `ALLOWED_ORIGINS` | `http://localhost:8080` | CORS allowed origins |
+
+---
+
+## 4. Start the Backend
+
+```bash
+python3 -m backend.run
+```
+
+The Flask API will start on `http://localhost:5000`. The SQLite database file (`lease_management.db`) is created automatically on first run in the directory where you run the command.
+
+---
+
+## 5. Start the Frontend
+
+In a separate terminal:
+
+```bash
 npm run dev
 ```
 
-The app will be available at: **http://localhost:8080**
-
-Navigate there and you should see **"Create your admin account to get started"** — the one-time admin setup screen.
+The React app will start on `http://localhost:8080` and automatically proxy `/api/*` requests to the Flask backend.
 
 ---
 
-## Daily Usage
+## 6. First-Run Bootstrap
 
-Once everything is installed, your daily workflow is:
+On first launch (when no admin exists), the app will show a **setup screen** to create the initial admin account:
 
-```powershell
-# 1. Open Docker Desktop (or ensure it's running)
+1. Open `http://localhost:8080`
+2. Fill in Name, Email, and Password (min 8 characters)
+3. Click **Create Admin & Sign In**
 
-# 2. Start local Supabase
-supabase start
+After the admin is created, the normal login screen will be shown on subsequent visits.
 
-# 3. Serve edge functions (in a separate terminal window)
-supabase functions serve
+---
 
-# 4. Start the app (in your main terminal)
-npm run dev
+## Project Structure
 
-# 5. Open browser to http://localhost:8080
+```
+/
+├── backend/                   Python/Flask backend
+│   ├── app.py                 Flask app factory + SQLAlchemy models
+│   ├── auth.py                Auth routes (/api/auth/*)
+│   ├── routes.py              Data CRUD + compute routes (/api/*)
+│   ├── computations.py        IFRS 16 / Ind AS 116 computation engine
+│   ├── run.py                 Entry point
+│   ├── requirements.txt       Python dependencies
+│   └── .env.example           Environment variable template
+│
+├── src/                       React frontend
+│   ├── lib/api.ts             API client (replaces Supabase client)
+│   ├── lib/store.ts           Data access layer → calls Flask API
+│   ├── hooks/useAuth.tsx      JWT-based auth provider
+│   └── pages/                 All app pages
+│
+├── vite.config.ts             Dev proxy: /api → http://localhost:5000
+└── LOCAL_SETUP.md             This file
 ```
 
-To stop everything:
+---
 
-```powershell
-# Stop the app: Press Ctrl+C in the terminal running npm run dev
+## API Endpoints
 
-# Stop edge functions: Press Ctrl+C in the terminal running supabase functions serve
+### Auth
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/api/auth/bootstrap` | Check if admin exists or create first admin |
+| POST | `/api/auth/login` | Login with email/password → JWT token |
+| POST | `/api/auth/logout` | Logout (client drops token) |
+| GET  | `/api/auth/me` | Get current user info |
 
-# Stop Supabase
-supabase stop
+### Data CRUD
+| Method | Path | Description |
+|--------|------|-------------|
+| GET/POST | `/api/groups` | Corporate groups |
+| DELETE | `/api/groups/:id` | Delete group |
+| GET/POST | `/api/entities` | Legal entities |
+| DELETE | `/api/entities/:id` | Delete entity |
+| GET/POST | `/api/leases` | Leases |
+| GET/DELETE | `/api/leases/:id` | Single lease |
+| GET/POST | `/api/lease-types` | Lease type config |
+| GET/POST | `/api/asset-locations` | Asset location config |
+| GET/POST | `/api/workflow-roles` | Workflow role config |
+| GET | `/api/profiles` | User profiles |
+| POST | `/api/users` | Create user (admin only) |
+| PUT | `/api/users/:id/role` | Update user role |
+| GET/POST | `/api/assignments` | User-entity assignments |
+| DELETE | `/api/assignments/:id` | Remove assignment |
+
+### Computations (Python)
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/api/compute/lease` | Compute single lease |
+| POST | `/api/compute/journals` | Generate journal entries |
+| POST | `/api/compute/batch` | Batch compute multiple leases |
+| POST | `/api/compute/disclosures` | Ind AS 116 disclosures |
+| GET  | `/api/compute/dashboard` | Dashboard statistics |
+
+---
+
+## Running Tests
+
+```bash
+npm run test
 ```
-
----
-
-## Useful Commands
-
-| Command | Description |
-|---------|-------------|
-| `supabase start` | Start local database & API services |
-| `supabase stop` | Stop all local services |
-| `supabase db reset` | Reset database and reapply all migrations |
-| `supabase status` | Check status and show connection details |
-| `supabase functions serve` | Serve all edge functions locally |
-| `npm run dev` | Start the frontend dev server |
-| `npm run build` | Build for production |
-
----
-
-## Access Local Database Admin
-
-Once Supabase is running locally, you can access the **Studio UI** (database admin panel) at:
-
-**http://127.0.0.1:54323**
-
-This lets you browse tables, run SQL queries, and manage data — all locally.
-
----
-
-## Troubleshooting
-
-### Admin creation screen not appearing (shows login instead)
-
-This is the most common first-run problem. It has three causes:
-
-**Cause A: Edge functions are not running**
-
-The app calls the `bootstrap-admin` edge function on startup to decide whether to show the setup screen or the login screen. If the function is not running, the call fails silently and the login screen is shown.
-
-Fix: make sure `supabase functions serve` is running in a separate terminal (see Step 6).
-
-**Cause B: `.env` is pointing at the wrong Supabase instance**
-
-If your `.env` still contains the original cloud URL (`https://uimvfdvfubyzmhvvlwci.supabase.co`) the app connects to the shared database which already has admin users, so it shows the login screen.
-
-Fix: update `.env` to use your local Supabase URL (`http://127.0.0.1:54321`) and local anon key (see Step 3).
-
-**Cause C: A previous run left an admin in your local database**
-
-If you created an admin in a previous session, that admin still exists in the local database. Clear it directly via SQL in Supabase Studio (**http://127.0.0.1:54323** → SQL Editor):
-
-```sql
-DELETE FROM user_roles WHERE role = 'admin';
-```
-
-Then refresh the app — the admin creation screen will appear.
-
-Alternatively, run `supabase db reset` to wipe and recreate the entire local database from scratch.
-
-### Docker Desktop not starting
-- Ensure **Virtualization** is enabled in BIOS
-- Ensure **WSL 2** is installed: `wsl --install` in PowerShell (admin)
-
-### Port conflicts
-- If port 54321 or 8080 is in use, check with: `netstat -ano | findstr :54321`
-- Stop conflicting services or change ports in `supabase/config.toml`
-
-### Supabase start fails
-- Make sure Docker Desktop is fully running (not just starting)
-- Try `supabase stop` then `supabase start` again
-
-### Database tables missing
-- Run `supabase db reset` to reapply migrations
-
----
-
-## Data Privacy
-
-- ✅ All data stays on your local machine
-- ✅ No data is sent to Lovable Cloud or any external server
-- ✅ The local and cloud databases are completely independent
-- ✅ After initial Docker image download, no internet is required
