@@ -78,6 +78,23 @@ On first launch (when no admin exists), the app will show a **setup screen** to 
 
 After the admin is created, the normal login screen will be shown on subsequent visits.
 
+### If the setup screen does not appear
+If you already have an admin in the SQLite DB (or you want to promote an existing user), you can manage admin status from the terminal:
+
+```bash
+# From the project root:
+python3 -m backend.cli admin status
+
+# Promote an existing user to admin (by email)
+python3 -m backend.cli admin promote --email you@company.com
+```
+
+If you need to wipe and recreate the admin (destructive):
+
+```bash
+python3 -m backend.cli admin reset --email you@company.com --full-name "Admin User" --yes
+```
+
 ---
 
 ## Project Structure
