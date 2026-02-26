@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import { getLeases, getGroups, getEntities } from '@/lib/store';
-import { supabase } from '@/integrations/supabase/client';
-import { computeDisclosures, formatCurrency } from '@/lib/computations';
+import { api } from '@/lib/api';
+import { formatCurrency } from '@/lib/computations';
 import { DisclosureData, Lease, CorporateGroup, Entity } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -36,6 +36,8 @@ export default function Disclosures() {
   const [entities, setEntities] = useState<Entity[]>([]);
   const [leaseTypes, setLeaseTypes] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
+  const [disclosure, setDisclosure] = useState<DisclosureData | null>(null);
+  const [disclosureLoading, setDisclosureLoading] = useState(false);
 
   // Filters — empty array = all selected
   const [selectedGroups, setSelectedGroups] = useState<string[]>([]);
@@ -49,12 +51,12 @@ export default function Disclosures() {
         getLeases(),
         getGroups(),
         getEntities(),
-        supabase.from('lease_types').select('lease_type_name').order('created_at'),
+        api.get<{ id: string; lease_type_name: string }[]>('/lease-types'),
       ]);
       setLeases(l);
       setGroups(g);
       setEntities(e);
-      setLeaseTypes((ltRes.data || []).map((r: any) => r.lease_type_name));
+      setLeaseTypes(ltRes.map((r) => r.lease_type_name));
       setLoading(false);
     };
     load();
@@ -92,13 +94,18 @@ export default function Disclosures() {
     });
   }, [leases, entities, selectedGroups, selectedEntities, selectedLeaseTypes]);
 
-  const disclosure = useMemo<DisclosureData | null>(() => {
-    if (filteredLeases.length === 0 || !reportingDate) return null;
-    try {
-      return computeDisclosures(filteredLeases, reportingDate);
-    } catch {
-      return null;
+  // Fetch disclosures from backend when leases or reporting date change
+  useEffect(() => {
+    if (filteredLeases.length === 0 || !reportingDate) {
+      setDisclosure(null);
+      return;
     }
+    setDisclosureLoading(true);
+    api.post<DisclosureData>('/compute/disclosures', { leases: filteredLeases, reporting_date: reportingDate })
+      .then(data => setDisclosure(data))
+      .catch(() => setDisclosure(null))
+      .finally(() => setDisclosureLoading(false));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filteredLeases, reportingDate]);
 
   const exportDisclosures = () => {
@@ -215,6 +222,11 @@ export default function Disclosures() {
           <FileBarChart className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
           <h3 className="text-lg font-semibold mb-1">No leases match filters</h3>
           <p className="text-sm text-muted-foreground">Adjust your filter selections to generate disclosures.</p>
+        </div>
+      ) : disclosureLoading ? (
+        <div className="bg-card border rounded-lg p-8 text-center">
+          <Loader2 className="w-8 h-8 animate-spin text-muted-foreground mx-auto mb-3" />
+          <p className="text-sm text-muted-foreground">Computing disclosures...</p>
         </div>
       ) : disclosure ? (
         <div className="space-y-6">

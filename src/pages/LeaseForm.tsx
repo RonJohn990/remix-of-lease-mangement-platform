@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { addMonths, parseISO, format, isBefore } from 'date-fns';
 import { Lease, Entity, Escalation, PaymentFrequency, PaymentTiming, LeaseClassification } from '@/lib/types';
 import { getEntities, getLease, saveLease, generateId } from '@/lib/store';
-import { supabase } from '@/integrations/supabase/client';
+import { api } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -52,12 +52,12 @@ export default function LeaseForm() {
     const load = async () => {
       const [ents, ltRes, alRes] = await Promise.all([
         getEntities(),
-        supabase.from('lease_types').select('lease_type_name').order('created_at'),
-        supabase.from('asset_locations').select('location_name').order('created_at'),
+        api.get<{ id: string; lease_type_name: string }[]>('/lease-types'),
+        api.get<{ id: string; location_name: string }[]>('/asset-locations'),
       ]);
       setEntities(ents);
-      setLeaseTypes((ltRes.data || []).map((r: any) => r.lease_type_name));
-      setAssetLocations((alRes.data || []).map((r: any) => r.location_name));
+      setLeaseTypes(ltRes.map((r) => r.lease_type_name));
+      setAssetLocations(alRes.map((r) => r.location_name));
       if (isEdit) {
         const lease = await getLease(id!);
         if (lease) setForm(lease);

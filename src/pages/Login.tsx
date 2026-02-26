@@ -1,5 +1,8 @@
 import { useState, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { useNavigate } from 'react-router-dom';
+import { api, setToken } from '@/lib/api';
+import type { AuthUser } from '@/lib/api';
+import { useSetAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Building, Loader2 } from 'lucide-react';
@@ -7,6 +10,8 @@ import { toast } from 'sonner';
 import { safeErrorMessage } from '@/lib/safeError';
 
 export default function Login() {
+  const navigate = useNavigate();
+  const setAuth = useSetAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
@@ -15,16 +20,8 @@ export default function Login() {
   const [checkingSetup, setCheckingSetup] = useState(true);
 
   useEffect(() => {
-    supabase.functions.invoke('bootstrap-admin', { body: { check_only: true } })
-      .then(({ data }) => {
-        if (data?.error === 'Admin already exists. Use the login page.') {
-          setSetupMode(false);
-        } else if (data?.needs_setup) {
-          setSetupMode(true);
-        } else {
-          setSetupMode(false);
-        }
-      })
+    api.post<{ needs_setup: boolean }>('/auth/bootstrap', { check_only: true })
+      .then(data => setSetupMode(data.needs_setup))
       .catch(() => setSetupMode(false))
       .finally(() => setCheckingSetup(false));
   }, []);
@@ -32,25 +29,34 @@ export default function Login() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) toast.error(safeErrorMessage(error));
-    setLoading(false);
+    try {
+      const { token, user } = await api.post<{ token: string; user: AuthUser }>('/auth/login', { email, password });
+      setToken(token);
+      setAuth?.(user);
+      navigate('/');
+    } catch (e: any) {
+      toast.error(safeErrorMessage(e));
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleSetup = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email || !password || !fullName) { toast.error('All fields required'); return; }
     setLoading(true);
-    const { data, error } = await supabase.functions.invoke('bootstrap-admin', {
-      body: { email, password, full_name: fullName },
-    });
-    if (error || data?.error) {
-      toast.error(safeErrorMessage(data?.error || error, 'Setup failed'));
-    } else {
+    try {
+      await api.post('/auth/bootstrap', { email, password, full_name: fullName });
       toast.success('Admin created! Signing in...');
-      await supabase.auth.signInWithPassword({ email, password });
+      const { token, user } = await api.post<{ token: string; user: AuthUser }>('/auth/login', { email, password });
+      setToken(token);
+      setAuth?.(user);
+      navigate('/');
+    } catch (e: any) {
+      toast.error(safeErrorMessage(e, 'Setup failed'));
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   if (checkingSetup) return (

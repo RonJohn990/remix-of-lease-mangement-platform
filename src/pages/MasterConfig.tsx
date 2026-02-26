@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { api } from '@/lib/api';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -44,13 +44,13 @@ export default function MasterConfig() {
 
   const reload = async () => {
     const [ltRes, alRes, wrRes] = await Promise.all([
-      supabase.from('lease_types').select('*').order('created_at', { ascending: true }),
-      supabase.from('asset_locations').select('*').order('created_at', { ascending: true }),
-      supabase.from('workflow_roles').select('*').order('created_at', { ascending: true }),
+      api.get<{ id: string; lease_type_name: string }[]>('/lease-types'),
+      api.get<{ id: string; location_name: string }[]>('/asset-locations'),
+      api.get<{ id: string; role_name: string; description: string }[]>('/workflow-roles'),
     ]);
-    setLeaseTypes((ltRes.data || []).map((r: any) => ({ id: r.id, name: r.lease_type_name })));
-    setAssetLocations((alRes.data || []).map((r: any) => ({ id: r.id, name: r.location_name })));
-    setWorkflowRoles((wrRes.data || []).map((r: any) => ({ id: r.id, role_name: r.role_name, description: r.description })));
+    setLeaseTypes(ltRes.map((r) => ({ id: r.id, name: r.lease_type_name })));
+    setAssetLocations(alRes.map((r) => ({ id: r.id, name: r.location_name })));
+    setWorkflowRoles(wrRes.map((r) => ({ id: r.id, role_name: r.role_name, description: r.description })));
   };
 
   useEffect(() => { reload().finally(() => setLoading(false)); }, []);
@@ -75,15 +75,15 @@ export default function MasterConfig() {
     try {
       if (dialogType === 'lease_type') {
         if (editItem) {
-          await supabase.from('lease_types').update({ lease_type_name: itemName.trim() }).eq('id', editItem.id);
+          await api.put(`/lease-types/${editItem.id}`, { lease_type_name: itemName.trim() });
         } else {
-          await supabase.from('lease_types').insert({ lease_type_name: itemName.trim() });
+          await api.post('/lease-types', { lease_type_name: itemName.trim() });
         }
       } else {
         if (editItem) {
-          await supabase.from('asset_locations').update({ location_name: itemName.trim() }).eq('id', editItem.id);
+          await api.put(`/asset-locations/${editItem.id}`, { location_name: itemName.trim() });
         } else {
-          await supabase.from('asset_locations').insert({ location_name: itemName.trim() });
+          await api.post('/asset-locations', { location_name: itemName.trim() });
         }
       }
       setDialogOpen(false);
@@ -98,9 +98,9 @@ export default function MasterConfig() {
     if (!confirm('Delete this item?')) return;
     try {
       if (type === 'lease_type') {
-        await supabase.from('lease_types').delete().eq('id', id);
+        await api.delete(`/lease-types/${id}`);
       } else {
-        await supabase.from('asset_locations').delete().eq('id', id);
+        await api.delete(`/asset-locations/${id}`);
       }
       await reload();
       toast.success('Deleted');
@@ -129,11 +129,9 @@ export default function MasterConfig() {
     setSaving(true);
     try {
       if (editRole) {
-        const { error } = await supabase.from('workflow_roles').update({ role_name: roleName.trim(), description: roleDesc.trim() }).eq('id', editRole.id);
-        if (error) throw error;
+        await api.put(`/workflow-roles/${editRole.id}`, { role_name: roleName.trim(), description: roleDesc.trim() });
       } else {
-        const { error } = await supabase.from('workflow_roles').insert({ role_name: roleName.trim(), description: roleDesc.trim() });
-        if (error) throw error;
+        await api.post('/workflow-roles', { role_name: roleName.trim(), description: roleDesc.trim() });
       }
       setRoleDialogOpen(false);
       await reload();
@@ -146,8 +144,7 @@ export default function MasterConfig() {
   const handleDeleteRole = async (id: string) => {
     if (!confirm('Delete this user role?')) return;
     try {
-      const { error } = await supabase.from('workflow_roles').delete().eq('id', id);
-      if (error) throw error;
+      await api.delete(`/workflow-roles/${id}`);
       await reload();
       toast.success('Deleted');
     } catch (e: any) {
