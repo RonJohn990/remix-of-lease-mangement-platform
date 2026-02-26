@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { CorporateGroup, Entity } from '@/lib/types';
 import { getGroups, getEntities, saveGroup, saveEntity, deleteGroup, deleteEntity, generateId } from '@/lib/store';
-import { supabase } from '@/integrations/supabase/client';
+import { api } from '@/lib/api';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -63,12 +63,12 @@ export default function Entities() {
     setGroups(g);
     setEntities(e);
     if (isAdmin) {
-      const [profilesRes, assignRes] = await Promise.all([
-        supabase.from('profiles').select('user_id, full_name, email'),
-        supabase.from('user_entity_assignments').select('*'),
+      const [profilesData, assignData] = await Promise.all([
+        api.get<{ user_id: string; full_name: string; email: string }[]>('/profiles'),
+        api.get<Assignment[]>('/assignments'),
       ]);
-      setUsers((profilesRes.data || []).map((p: any) => ({ user_id: p.user_id, full_name: p.full_name, email: p.email })));
-      setAssignments((assignRes.data || []).map((a: any) => ({ id: a.id, user_id: a.user_id, entity_id: a.entity_id, corporate_id: a.corporate_id })));
+      setUsers(profilesData);
+      setAssignments(assignData);
     }
   };
 
@@ -179,12 +179,11 @@ export default function Entities() {
     if (!entity) return;
     setSaving(true);
     try {
-      const { error } = await supabase.from('user_entity_assignments').insert({
+      await api.post('/assignments', {
         user_id: assignUserId,
         corporate_id: entity.corporate_id,
         entity_id: assignEntityId,
       });
-      if (error) throw error;
       await reload();
       toast.success('User assigned to entity');
     } catch (e: any) {
@@ -194,7 +193,7 @@ export default function Entities() {
 
   const handleRemoveEntityAssignment = async (assignmentId: string) => {
     try {
-      await supabase.from('user_entity_assignments').delete().eq('id', assignmentId);
+      await api.delete(`/assignments/${assignmentId}`);
       await reload();
       toast.success('Assignment removed');
     } catch (e: any) { toast.error(safeErrorMessage(e, 'Failed to remove assignment')); }

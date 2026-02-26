@@ -2,7 +2,8 @@ import { useEffect, useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Lease, LeaseComputation, JournalEntry, LeaseModification } from '@/lib/types';
 import { getLease, saveLease } from '@/lib/store';
-import { computeLease, generateJournalEntries, formatCurrency } from '@/lib/computations';
+import { formatCurrency } from '@/lib/computations';
+import { api } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
@@ -38,9 +39,12 @@ export default function LeaseDetail() {
     if (!l.modifications) l.modifications = [];
     setLease(l);
     try {
-      const comp = computeLease(l);
+      const [comp, journalEntries] = await Promise.all([
+        api.post<LeaseComputation>('/compute/lease', { lease: l }),
+        api.post<JournalEntry[]>('/compute/journals', { lease: l }),
+      ]);
       setComputation(comp);
-      setJournals(generateJournalEntries(l, comp));
+      setJournals(journalEntries);
       setError('');
     } catch (e: any) {
       setError(e.message || 'Computation error');
