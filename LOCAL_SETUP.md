@@ -87,18 +87,24 @@ Once complete, the CLI will display output like this:
 
 ### Step 3: Configure Environment Variables
 
-Create or update the `.env` file in the project root:
+The repository ships with a `.env.example` template. **You must create your own `.env` file — do not skip this step.** Using the wrong values here is the most common reason the admin-creation screen never appears.
+
+```powershell
+copy .env.example .env
+```
+
+Open the new `.env` file and set the two values using the output from Step 2:
 
 ```env
 VITE_SUPABASE_URL=http://127.0.0.1:54321
 VITE_SUPABASE_PUBLISHABLE_KEY=<paste_your_local_anon_key_here>
 ```
 
-Replace `<paste_your_local_anon_key_here>` with the `anon key` from Step 2.
+> ⚠️ **Do not use the cloud URL** (e.g. `https://uimvfdvfubyzmhvvlwci.supabase.co`). That URL points to a shared database that already has admin users, which will prevent the first-time setup screen from appearing.
 
 ### Step 4: Apply Database Migrations
 
-This creates all the tables (corporate_groups, entities, leases):
+This creates all the tables (corporate_groups, entities, leases, user_roles):
 
 ```powershell
 supabase db reset
@@ -112,13 +118,27 @@ You should see output confirming migrations were applied successfully.
 npm install
 ```
 
-### Step 6: Start the Application
+### Step 6: Serve Edge Functions
+
+The app relies on Supabase Edge Functions (e.g. `bootstrap-admin`). Open a **second PowerShell window** in the project directory and run:
+
+```powershell
+supabase functions serve
+```
+
+Leave this window open while you use the app. Without this step the admin-creation screen will not appear.
+
+### Step 7: Start the Application
+
+Back in your first PowerShell window:
 
 ```powershell
 npm run dev
 ```
 
 The app will be available at: **http://localhost:8080**
+
+Navigate there and you should see **"Create your admin account to get started"** — the one-time admin setup screen.
 
 ---
 
@@ -132,16 +152,21 @@ Once everything is installed, your daily workflow is:
 # 2. Start local Supabase
 supabase start
 
-# 3. Start the app
+# 3. Serve edge functions (in a separate terminal window)
+supabase functions serve
+
+# 4. Start the app (in your main terminal)
 npm run dev
 
-# 4. Open browser to http://localhost:8080
+# 5. Open browser to http://localhost:8080
 ```
 
 To stop everything:
 
 ```powershell
-# Stop the app: Press Ctrl+C in the terminal
+# Stop the app: Press Ctrl+C in the terminal running npm run dev
+
+# Stop edge functions: Press Ctrl+C in the terminal running supabase functions serve
 
 # Stop Supabase
 supabase stop
@@ -157,6 +182,7 @@ supabase stop
 | `supabase stop` | Stop all local services |
 | `supabase db reset` | Reset database and reapply all migrations |
 | `supabase status` | Check status and show connection details |
+| `supabase functions serve` | Serve all edge functions locally |
 | `npm run dev` | Start the frontend dev server |
 | `npm run build` | Build for production |
 
@@ -173,6 +199,34 @@ This lets you browse tables, run SQL queries, and manage data — all locally.
 ---
 
 ## Troubleshooting
+
+### Admin creation screen not appearing (shows login instead)
+
+This is the most common first-run problem. It has three causes:
+
+**Cause A: Edge functions are not running**
+
+The app calls the `bootstrap-admin` edge function on startup to decide whether to show the setup screen or the login screen. If the function is not running, the call fails silently and the login screen is shown.
+
+Fix: make sure `supabase functions serve` is running in a separate terminal (see Step 6).
+
+**Cause B: `.env` is pointing at the wrong Supabase instance**
+
+If your `.env` still contains the original cloud URL (`https://uimvfdvfubyzmhvvlwci.supabase.co`) the app connects to the shared database which already has admin users, so it shows the login screen.
+
+Fix: update `.env` to use your local Supabase URL (`http://127.0.0.1:54321`) and local anon key (see Step 3).
+
+**Cause C: A previous run left an admin in your local database**
+
+If you created an admin in a previous session, that admin still exists in the local database. Clear it directly via SQL in Supabase Studio (**http://127.0.0.1:54323** → SQL Editor):
+
+```sql
+DELETE FROM user_roles WHERE role = 'admin';
+```
+
+Then refresh the app — the admin creation screen will appear.
+
+Alternatively, run `supabase db reset` to wipe and recreate the entire local database from scratch.
 
 ### Docker Desktop not starting
 - Ensure **Virtualization** is enabled in BIOS
