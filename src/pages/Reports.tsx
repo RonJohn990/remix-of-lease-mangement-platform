@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Download, FileSpreadsheet, Loader2, Filter, Search } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { toast } from 'sonner';
 import { parseISO, isAfter, isBefore, format } from 'date-fns';
 import MultiSelectFilter from '@/components/MultiSelectFilter';
 
@@ -150,7 +151,12 @@ export default function Reports() {
     // Ensure computations are available
     let comps = computations;
     if (Object.keys(comps).length === 0) {
-      comps = await fetchComputations(filteredLeases) as typeof computations;
+      try {
+        comps = await fetchComputations(filteredLeases) as typeof computations;
+      } catch (e: any) {
+        toast.error('Failed to compute lease data: ' + (e?.message || 'Unknown error'));
+        return;
+      }
     }
 
     const lines: string[] = [];

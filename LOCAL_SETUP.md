@@ -49,7 +49,7 @@ Key variables:
 ## 4. Start the Backend
 
 ```bash
-python3 -m backend.run
+python3 -m backend.run  # must be run from the project root directory
 ```
 
 The Flask API will start on `http://localhost:5000`. The SQLite database file (`lease_management.db`) is created automatically on first run in the directory where you run the command.

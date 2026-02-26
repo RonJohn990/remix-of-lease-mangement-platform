@@ -3,7 +3,7 @@
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity
 from werkzeug.security import generate_password_hash, check_password_hash
-from .app import db, Profile, UserRole
+from .app import db, Profile, UserRole, gen_uuid
 
 auth_bp = Blueprint('auth', __name__)
 
@@ -42,8 +42,7 @@ def bootstrap():
     if Profile.query.filter_by(email=email).first():
         return jsonify({'error': 'A user with this email already exists'}), 400
 
-    import uuid
-    user_id = str(uuid.uuid4())
+    user_id = gen_uuid()
     profile = Profile(
         user_id=user_id,
         email=email,

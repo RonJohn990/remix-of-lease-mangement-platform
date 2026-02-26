@@ -1,4 +1,4 @@
-"""Entry point: python run.py"""
+"""Entry point: run with `python3 -m backend.run` from the project root directory."""
 
 from backend.app import create_app
 import os
