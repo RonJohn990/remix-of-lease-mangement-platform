@@ -4,17 +4,13 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-<<<<<<< HEAD
     "dev": "concurrently -k -n api,web -c yellow,cyan \"npm run dev:api\" \"npm run dev:web\"",
     "dev:api": "python -m backend.run",
-    "dev:web": "wait-on tcp:5000 && vite"
-=======
-    "dev": "vite",
+    "dev:web": "wait-on tcp:5000 && vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest"
->>>>>>> 16bb6d2b06559b589400b1aa8831fd333abbb16f
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
@@ -45,10 +41,7 @@
     "@radix-ui/react-toggle": "^1.1.9",
     "@radix-ui/react-toggle-group": "^1.1.10",
     "@radix-ui/react-tooltip": "^1.2.7",
-<<<<<<< HEAD
     "@supabase/supabase-js": "^2.97.0",
-=======
->>>>>>> 16bb6d2b06559b589400b1aa8831fd333abbb16f
     "@tanstack/react-query": "^5.83.0",
     "@types/papaparse": "^5.5.2",
     "class-variance-authority": "^0.7.1",
@@ -74,12 +67,6 @@
     "zod": "^3.25.76"
   },
   "devDependencies": {
-<<<<<<< HEAD
-    "@vitejs/plugin-react-swc": "^4.2.3",
-    "concurrently": "^9.0.0",
-    "vite": "^7.3.1",
-    "wait-on": "^7.0.1"
-=======
     "@eslint/js": "^9.32.0",
     "@tailwindcss/typography": "^0.5.16",
     "@testing-library/jest-dom": "^6.6.0",
@@ -87,8 +74,9 @@
     "@types/node": "^22.16.5",
     "@types/react": "^18.3.23",
     "@types/react-dom": "^18.3.7",
-    "@vitejs/plugin-react-swc": "^3.11.0",
+    "@vitejs/plugin-react-swc": "^4.2.3",
     "autoprefixer": "^10.4.21",
+    "concurrently": "^9.0.0",
     "eslint": "^9.32.0",
     "eslint-plugin-react-hooks": "^5.2.0",
     "eslint-plugin-react-refresh": "^0.4.20",
@@ -99,8 +87,8 @@
     "tailwindcss": "^3.4.17",
     "typescript": "^5.8.3",
     "typescript-eslint": "^8.38.0",
-    "vite": "^5.4.19",
-    "vitest": "^3.2.4"
->>>>>>> 16bb6d2b06559b589400b1aa8831fd333abbb16f
+    "vite": "^7.3.1",
+    "vitest": "^3.2.4",
+    "wait-on": "^7.0.1"
   }
 }
